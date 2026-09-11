@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from database.database import get_connection
-from models.user import create_user, get_user_by_email
+from models.user import create_user, get_user_by_email, verify_password
 
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -13,6 +13,11 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     role: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 @router.post("/register")
@@ -75,3 +80,56 @@ def register_user(data: RegisterRequest):
 
     finally:
         connection.close()
+
+
+@router.post("/login")
+def login_user(data: LoginRequest):
+    """
+    Authenticate user with email and password.
+    """
+
+    email_clean = data.email.strip().lower()
+
+    if not email_clean:
+        raise HTTPException(
+            status_code=400,
+            detail="Email is required"
+        )
+
+    if not data.password:
+        raise HTTPException(
+            status_code=400,
+            detail="Password is required"
+        )
+
+    connection = get_connection()
+
+    try:
+        user = get_user_by_email(connection, email_clean)
+
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password"
+            )
+
+        # Verify password hash
+        if not verify_password(data.password, user["password_hash"]):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password"
+            )
+
+        return {
+            "success": True,
+            "message": "Login successful",
+            "user": {
+                "id": user["id"],
+                "name": user["name"],
+                "email": user["email"],
+                "role": user["role"]
+            }
+        }
+
+    finally:
+        connection.close()

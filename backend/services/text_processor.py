@@ -1,6 +1,18 @@
 import re
 import nltk
 
+
+def _ensure_nltk_resources():
+    """Ensure required NLTK data resources are downloaded safely."""
+    for resource in ["stopwords", "wordnet", "omw-1.4"]:
+        try:
+            nltk.data.find(f"corpora/{resource}")
+        except LookupError:
+            nltk.download(resource, quiet=True)
+
+
+_ensure_nltk_resources()
+
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
