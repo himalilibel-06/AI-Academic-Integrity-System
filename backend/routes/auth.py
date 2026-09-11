@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from database.database import get_connection
 from models.user import create_user, get_user_by_email, verify_password
+from utils.auth import create_access_token, get_current_user_payload
 
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -85,7 +86,7 @@ def register_user(data: RegisterRequest):
 @router.post("/login")
 def login_user(data: LoginRequest):
     """
-    Authenticate user with email and password.
+    Authenticate user with email and password, returning JWT access token.
     """
 
     email_clean = data.email.strip().lower()
@@ -120,9 +121,17 @@ def login_user(data: LoginRequest):
                 detail="Invalid email or password"
             )
 
+        token_data = {
+            "sub": str(user["id"]),
+            "email": user["email"],
+            "role": user["role"]
+        }
+        access_token = create_access_token(token_data)
+
         return {
             "success": True,
             "message": "Login successful",
+            "token": access_token,
             "user": {
                 "id": user["id"],
                 "name": user["name"],
@@ -132,4 +141,44 @@ def login_user(data: LoginRequest):
         }
 
     finally:
-        connection.close()
+        connection.close()
+
+
+@router.get("/me")
+def get_current_user(payload: dict = Depends(get_current_user_payload)):
+    """
+    Return active authenticated user details.
+    """
+    user_email = payload.get("email")
+
+    if not user_email:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid token payload"
+        )
+
+    connection = get_connection()
+
+    try:
+        user = get_user_by_email(connection, user_email)
+
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
+
+        return {
+            "success": True,
+            "user": {
+                "id": user["id"],
+                "name": user["name"],
+                "email": user["email"],
+                "role": user["role"],
+                "created_at": str(user["created_at"]) if user["created_at"] else None
+            }
+        }
+
+    finally:
+        connection.close()
+

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -36,37 +37,81 @@ function NotFound() {
   );
 }
 
+function ProtectedRoute({ children, allowedRoles }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-slate-600 font-medium">Loading session...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    const redirectPath = user.role === "professor" ? "/professor/dashboard" : "/student/dashboard";
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  return children;
+}
+
+function PublicOnlyRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-slate-600 font-medium">Loading session...</div>
+      </div>
+    );
+  }
+
+  if (user) {
+    const redirectPath = user.role === "professor" ? "/professor/dashboard" : "/student/dashboard";
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Default route */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Default route */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* Public routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+          {/* Public routes (only accessible when logged out) */}
+          <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+          <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
 
-        {/* Student routes */}
-        <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/student/upload" element={<UploadSubmission />} />
-        <Route path="/student/submissions" element={<MySubmissions />} />
-        <Route path="/student/reports" element={<PlagiarismReport />} />
-        <Route path="/student/profile" element={<Profile />} />
-        <Route path="/student/settings" element={<Settings />} />
+          {/* Student routes (protected) */}
+          <Route path="/student/dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboard /></ProtectedRoute>} />
+          <Route path="/student/upload" element={<ProtectedRoute allowedRoles={["student"]}><UploadSubmission /></ProtectedRoute>} />
+          <Route path="/student/submissions" element={<ProtectedRoute allowedRoles={["student"]}><MySubmissions /></ProtectedRoute>} />
+          <Route path="/student/reports" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
+          <Route path="/student/profile" element={<ProtectedRoute allowedRoles={["student"]}><Profile /></ProtectedRoute>} />
+          <Route path="/student/settings" element={<ProtectedRoute allowedRoles={["student"]}><Settings /></ProtectedRoute>} />
 
-        {/* Professor routes */}
-        <Route path="/professor/dashboard" element={<ProfessorDashboard />} />
-        <Route path="/professor/submissions" element={<ReviewSubmissions />} />
-        <Route path="/professor/reports" element={<ReportReview />} />
-        <Route path="/professor/reports/:id" element={<ReportReview />} />
-        <Route path="/professor/courses" element={<Courses />} />
-        <Route path="/professor/profile" element={<Profile />} />
-        <Route path="/professor/settings" element={<Settings />} />
+          {/* Professor routes (protected) */}
+          <Route path="/professor/dashboard" element={<ProtectedRoute allowedRoles={["professor"]}><ProfessorDashboard /></ProtectedRoute>} />
+          <Route path="/professor/submissions" element={<ProtectedRoute allowedRoles={["professor"]}><ReviewSubmissions /></ProtectedRoute>} />
+          <Route path="/professor/reports" element={<ProtectedRoute allowedRoles={["professor"]}><ReportReview /></ProtectedRoute>} />
+          <Route path="/professor/reports/:id" element={<ProtectedRoute allowedRoles={["professor"]}><ReportReview /></ProtectedRoute>} />
+          <Route path="/professor/courses" element={<ProtectedRoute allowedRoles={["professor"]}><Courses /></ProtectedRoute>} />
+          <Route path="/professor/profile" element={<ProtectedRoute allowedRoles={["professor"]}><Profile /></ProtectedRoute>} />
+          <Route path="/professor/settings" element={<ProtectedRoute allowedRoles={["professor"]}><Settings /></ProtectedRoute>} />
 
-        {/* Unknown routes */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Unknown routes */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 // Simple inline icons (no extra packages)
 function EyeIcon({ open }) {
@@ -62,13 +63,18 @@ function AcademicNetworkVisual() {
 }
 
 export default function Login() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
   const [role, setRole] = useState("student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validate = () => {
     const nextErrors = {};
@@ -87,18 +93,32 @@ export default function Login() {
     return nextErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSuccessMessage("");
+    setApiError("");
 
     const nextErrors = validate();
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length === 0) {
-      // NOTE: no real authentication — this is a frontend-only demo state.
-      // Replace with a call to the FastAPI /auth/login endpoint later.
-      setSuccessMessage("Login successful (demo mode)");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      setIsSubmitting(true);
+      try {
+        const loggedInUser = await login(email.trim(), password);
+        setSuccessMessage("Login successful! Redirecting...");
+
+        setTimeout(() => {
+          if (loggedInUser.role === "professor") {
+            navigate("/professor/dashboard");
+          } else {
+            navigate("/student/dashboard");
+          }
+        }, 500);
+      } catch (err) {
+        setApiError(err.message || "Invalid email or password");
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -266,6 +286,16 @@ export default function Login() {
                 </label>
               </div>
 
+              {/* API error message */}
+              {apiError && (
+                <div
+                  role="alert"
+                  className="rounded-lg bg-red-50 border border-red-200 px-3.5 py-2.5 text-sm text-red-700"
+                >
+                  {apiError}
+                </div>
+              )}
+
               {/* Success message */}
               {successMessage && (
                 <div
@@ -278,9 +308,10 @@ export default function Login() {
 
               <button
                 type="submit"
-                className="w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                disabled={isSubmitting}
+                className="w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-50"
               >
-                Sign in as {role === "student" ? "Student" : "Professor"}
+                {isSubmitting ? "Signing in..." : `Sign in as ${role === "student" ? "Student" : "Professor"}`}
               </button>
             </form>
 
