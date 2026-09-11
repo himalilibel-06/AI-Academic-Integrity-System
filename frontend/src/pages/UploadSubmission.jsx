@@ -125,32 +125,79 @@ export default function UploadSubmission() {
   const isFormValid =
     course !== "" && title.trim() !== "" && selectedFile !== null;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+ const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!selectedFile) {
-      setFileError("Please select a file.");
-      return;
+  if (!selectedFile) {
+    setFileError("Please select a file.");
+    return;
+  }
+
+  if (!isFormValid || isProcessing) {
+    return;
+  }
+
+  setIsProcessing(true);
+  setFileError("");
+
+  try {
+    // Create form data
+    const formData = new FormData();
+
+    // Add the selected document
+    formData.append("file", selectedFile);
+
+    // Send document to FastAPI
+    const response = await fetch(
+      "http://127.0.0.1:8000/api/v1/analyze",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    // Get backend response
+    const result = await response.json();
+
+    // Check for backend error
+    if (!response.ok) {
+      throw new Error(
+        result.detail || "Document analysis failed."
+      );
     }
-    if (!isFormValid || isProcessing) {
-      return;
-    }
 
-    setIsProcessing(true);
+    console.log("Analysis result:", result);
 
-    setTimeout(() => {
-      const courseLabel =
-        COURSE_OPTIONS.find((c) => c.value === course)?.label || course;
+    // Get course name
+    const courseLabel =
+      COURSE_OPTIONS.find((c) => c.value === course)?.label || course;
 
-      setSubmittedInfo({
-        title: title.trim(),
-        course: courseLabel,
-        fileName: selectedFile.name,
-      });
-      setIsProcessing(false);
-      setIsSuccess(true);
-    }, 2000);
-  };
+    // Store submission information
+    setSubmittedInfo({
+      title: title.trim(),
+      course: courseLabel,
+      fileName: selectedFile.name,
+
+      // AI analysis result
+      similarityScore: result.overall_similarity_score,
+      riskLevel: result.risk_level,
+      matches: result.matches,
+    });
+
+    setIsProcessing(false);
+    setIsSuccess(true);
+
+  } catch (error) {
+    console.error("Analysis error:", error);
+
+    setFileError(
+      error.message ||
+        "Unable to connect to the plagiarism analysis server."
+    );
+
+    setIsProcessing(false);
+  }
+};
 
   const handleUploadAnother = () => {
     setCourse("");
