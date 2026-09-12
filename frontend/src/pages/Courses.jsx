@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { getProfessorCourses, createCourse } from "../service/api";
 
 /* ---------------------------------------------------------
    Inline icons (no extra dependency)
@@ -92,58 +94,6 @@ const icons = {
   ),
 };
 
-/* ---------------------------------------------------------
-   Mock data — replace with API data once the backend is live
---------------------------------------------------------- */
-const professor = { name: "Dr. Anitha Kumar", initials: "AK" };
-
-const initialCourses = [
-  {
-    id: 1,
-    code: "CS402",
-    name: "Artificial Intelligence",
-    description: "Introduction to artificial intelligence, intelligent agents and machine learning.",
-    students: 42,
-    submissions: 38,
-    pendingReviews: 4,
-    averageSimilarity: 18,
-    status: "Active",
-  },
-  {
-    id: 2,
-    code: "CS420",
-    name: "Machine Learning",
-    description: "Supervised and unsupervised learning techniques with applied case studies.",
-    students: 35,
-    submissions: 30,
-    pendingReviews: 3,
-    averageSimilarity: 22,
-    status: "Active",
-  },
-  {
-    id: 3,
-    code: "CS305",
-    name: "Database Systems",
-    description: "Relational database design, normalization and query optimization.",
-    students: 48,
-    submissions: 44,
-    pendingReviews: 3,
-    averageSimilarity: 11,
-    status: "Active",
-  },
-  {
-    id: 4,
-    code: "CS310",
-    name: "Operating Systems",
-    description: "Process management, memory management and file systems fundamentals.",
-    students: 39,
-    submissions: 33,
-    pendingReviews: 2,
-    averageSimilarity: 9,
-    status: "Completed",
-  },
-];
-
 const navItems = [
   { label: "Dashboard", icon: icons.dashboard, to: "/professor/dashboard" },
   { label: "Submissions", icon: icons.submissions, to: "/professor/submissions" },
@@ -153,7 +103,7 @@ const navItems = [
   { label: "Settings", icon: icons.settings, to: "/professor/settings" },
 ];
 
-const filterOptions = ["All", "Active", "Completed"];
+const filterOptions = ["All", "Active"];
 
 function StatusBadge({ status }) {
   const styles = {
@@ -177,23 +127,60 @@ function SimilarityValue({ value }) {
 }
 
 export default function Courses() {
+  const { user, logout } = useAuth();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [courses, setCourses] = useState(initialCourses);
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({ code: "", name: "", description: "" });
   const [formErrors, setFormErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+
+  const loadCourses = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getProfessorCourses();
+      if (data && Array.isArray(data.courses)) {
+        setCourses(data.courses);
+      } else {
+        setError("Failed to load courses from server.");
+      }
+    } catch (err) {
+      setError(err.message || "Failed to load courses.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCourses();
+  }, []);
+
+  const professorInitials = user?.name
+    ? user.name
+        .split(" ")
+        .filter(Boolean)
+        .map((p) => p[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "PR";
 
   const filteredCourses = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return courses.filter((course) => {
       const matchesQuery =
         !query ||
-        course.code.toLowerCase().includes(query) ||
-        course.name.toLowerCase().includes(query);
+        course.code?.toLowerCase().includes(query) ||
+        course.name?.toLowerCase().includes(query) ||
+        course.description?.toLowerCase().includes(query);
       const matchesStatus = statusFilter === "All" || course.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
@@ -202,9 +189,9 @@ export default function Courses() {
   const totals = useMemo(
     () => ({
       totalCourses: courses.length,
-      totalStudents: courses.reduce((sum, c) => sum + c.students, 0),
-      totalSubmissions: courses.reduce((sum, c) => sum + c.submissions, 0),
-      pendingReviews: courses.reduce((sum, c) => sum + c.pendingReviews, 0),
+      totalStudents: courses.reduce((sum, c) => sum + (c.students || 0), 0),
+      totalSubmissions: courses.reduce((sum, c) => sum + (c.submissions || 0), 0),
+      pendingReviews: courses.reduce((sum, c) => sum + (c.pendingReviews || 0), 0),
     }),
     [courses]
   );
@@ -231,12 +218,12 @@ export default function Courses() {
     setFormValues((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  const handleCreateCourse = (e) => {
+  const handleCreateCourse = async (e) => {
     e.preventDefault();
 
     const nextErrors = {};
     if (!formValues.code.trim()) {
-      nextErrors.code = "Course code is required.";
+      nextErrors.code = "Course code is required (e.g. CS405).";
     }
     if (!formValues.name.trim()) {
       nextErrors.name = "Course name is required.";
@@ -245,24 +232,25 @@ export default function Courses() {
 
     if (Object.keys(nextErrors).length > 0) return;
 
-    // NOTE: local state only — no backend call. Replace with a POST to
-    // FastAPI's /courses endpoint once the backend is connected.
-    const newCourse = {
-      id: courses.length ? Math.max(...courses.map((c) => c.id)) + 1 : 1,
-      code: formValues.code.trim(),
-      name: formValues.name.trim(),
-      description: formValues.description.trim() || "No description provided.",
-      students: 0,
-      submissions: 0,
-      pendingReviews: 0,
-      averageSimilarity: 0,
-      status: "Active",
-    };
+    setIsSubmitting(true);
+    try {
+      const res = await createCourse({
+        code: formValues.code.trim(),
+        name: formValues.name.trim(),
+        description: formValues.description.trim(),
+      });
 
-    setCourses((prev) => [...prev, newCourse]);
-    setModalOpen(false);
-    setSuccessMessage("Course created successfully (demo mode).");
-    setTimeout(() => setSuccessMessage(""), 3000);
+      if (res && res.success) {
+        setModalOpen(false);
+        setSuccessMessage(res.message || "Course created successfully!");
+        await loadCourses();
+        setTimeout(() => setSuccessMessage(""), 4000);
+      }
+    } catch (err) {
+      setFormErrors({ form: err.message || "Failed to create course." });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -279,7 +267,7 @@ export default function Courses() {
         </button>
         <span className="text-sm font-semibold text-slate-900">AI Academic Integrity</span>
         <div className="h-8 w-8 rounded-full bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center">
-          {professor.initials}
+          {professorInitials}
         </div>
       </div>
 
@@ -300,8 +288,10 @@ export default function Courses() {
       >
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">AI Academic Integrity</p>
-            <p className="text-xs text-emerald-400 mt-0.5">Professor Portal</p>
+            <span className="text-lg font-semibold text-white">
+              Integrity<span className="text-emerald-400">Check</span>
+            </span>
+            <p className="text-xs text-slate-400 mt-0.5">Professor Courses</p>
           </div>
           <button
             type="button"
@@ -323,7 +313,7 @@ export default function Courses() {
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                   isActive
-                    ? "bg-emerald-500 text-white"
+                    ? "bg-emerald-500 text-white font-medium"
                     : "text-slate-300 hover:bg-white/5 hover:text-white"
                 }`}
               >
@@ -336,7 +326,8 @@ export default function Courses() {
 
         <button
           type="button"
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white"
+          onClick={logout}
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
         >
           {icons.logout({ className: "h-5 w-5" })}
           Logout
@@ -345,44 +336,52 @@ export default function Courses() {
 
       {/* Main content */}
       <div className="flex-1 min-w-0">
-        <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8 space-y-6">
-          {/* Breadcrumb + header */}
+        {/* Header */}
+        <header className="hidden lg:flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
           <div>
-            <p className="text-xs text-slate-500">
-              Professor Dashboard <span className="mx-1">/</span> Courses
+            <h1 className="text-xl font-semibold text-slate-900">Course Management</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage your academic courses and view submission and enrollment analytics.
             </p>
-            <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-xl font-semibold text-slate-900">My Courses</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  Manage your courses and monitor student submission activity.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openModal}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors whitespace-nowrap"
-              >
-                {icons.plus({ className: "h-4 w-4" })}
-                Create Course
-              </button>
-            </div>
           </div>
-
-          {/* Success message */}
-          {successMessage && (
-            <div
-              role="status"
-              className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700"
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={openModal}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 shadow-sm transition"
             >
+              {icons.plus({ className: "h-4 w-4" })}
+              Add New Course
+            </button>
+          </div>
+        </header>
+
+        <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8 space-y-6">
+          {/* Success banner */}
+          {successMessage && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
               {successMessage}
             </div>
           )}
 
-          {/* Statistics */}
+          {/* Error banner */}
+          {error && (
+            <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <p>{error}</p>
+              <button
+                type="button"
+                onClick={loadCourses}
+                className="ml-4 font-semibold underline hover:text-red-900"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {/* Summary stats */}
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {summaryStats.map((stat) => (
-              <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
+              <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm text-slate-500">{stat.label}</p>
@@ -396,220 +395,212 @@ export default function Courses() {
             ))}
           </section>
 
-          {/* Similarity explanation */}
-          <section className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-5 py-4 flex gap-3">
-            <div className="text-emerald-500 flex-shrink-0">
-              {icons.info({ className: "h-5 w-5" })}
-            </div>
-            <p className="text-sm text-emerald-900 leading-relaxed">
-              Average similarity represents the average matching-content score across submitted
-              documents. It does not indicate confirmed plagiarism.
-            </p>
-          </section>
-
-          {/* Search + filter */}
-          <section className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+          {/* Controls bar */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="relative flex-1 max-w-md">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                 {icons.search({ className: "h-4 w-4" })}
-              </span>
-              <label htmlFor="course-search" className="sr-only">
-                Search courses
-              </label>
+              </div>
               <input
-                id="course-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search courses..."
-                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
+                placeholder="Search courses by code or title..."
+                className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
               />
             </div>
-
-            <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
-              {filterOptions.map((option) => {
-                const isActive = statusFilter === option;
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setStatusFilter(option)}
-                    aria-pressed={isActive}
-                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-emerald-500 text-white"
-                        : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {option}
-                  </button>
-                );
-              })}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={openModal}
+                className="lg:hidden inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 shadow-sm"
+              >
+                {icons.plus({ className: "h-4 w-4" })}
+                Add Course
+              </button>
             </div>
-          </section>
+          </div>
 
-          {/* Course cards */}
-          {filteredCourses.length > 0 ? (
-            <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {/* Courses list */}
+          {loading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+              <svg className="mx-auto h-8 w-8 animate-spin text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <p className="mt-4 text-sm font-medium text-slate-700">Loading courses...</p>
+            </div>
+          ) : courses.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+              <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                {icons.courses({ className: "h-6 w-6" })}
+              </div>
+              <p className="text-sm font-semibold text-slate-900">No courses created yet</p>
+              <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
+                Create your first academic course so students can select it when submitting assignments.
+              </p>
+              <button
+                type="button"
+                onClick={openModal}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 transition"
+              >
+                {icons.plus({ className: "h-4 w-4" })}
+                Create First Course
+              </button>
+            </div>
+          ) : filteredCourses.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+              <p className="text-sm font-medium text-slate-700">No courses match your search.</p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="mt-3 text-sm font-medium text-emerald-600 hover:underline"
+              >
+                Clear Search
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
               {filteredCourses.map((course) => (
                 <div
                   key={course.id}
-                  className="rounded-2xl border border-slate-200 bg-white px-5 py-5 flex flex-col gap-4"
+                  className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-emerald-300 transition"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500 flex-shrink-0">
-                        {icons.folder({ className: "h-5 w-5" })}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{course.code}</p>
-                        <p className="text-xs text-slate-500">{course.name}</p>
-                      </div>
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <span className="inline-flex rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                        {course.code}
+                      </span>
+                      <StatusBadge status={course.status} />
                     </div>
-                    <StatusBadge status={course.status} />
+                    <h3 className="text-base font-semibold text-slate-900">{course.name}</h3>
+                    <p className="mt-2 text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                      {course.description || "No course description provided."}
+                    </p>
                   </div>
 
-                  <p className="text-sm text-slate-600 leading-relaxed">{course.description}</p>
+                  <div className="mt-6 pt-4 border-t border-slate-100">
+                    <div className="grid grid-cols-2 gap-y-2 text-xs text-slate-500 mb-4">
+                      <span>Enrolled Students:</span>
+                      <span className="text-right font-semibold text-slate-800">{course.students || 0}</span>
+                      <span>Total Submissions:</span>
+                      <span className="text-right font-semibold text-slate-800">{course.submissions || 0}</span>
+                      <span>Pending Reviews:</span>
+                      <span className="text-right font-semibold text-slate-800">{course.pendingReviews || 0}</span>
+                      <span>Avg Similarity:</span>
+                      <span className="text-right font-semibold text-slate-800">
+                        <SimilarityValue value={course.averageSimilarity || 0} />
+                      </span>
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-y-2 text-sm border-t border-slate-100 pt-3">
-                    <span className="text-slate-500">Students</span>
-                    <span className="text-right font-medium text-slate-800">{course.students}</span>
-                    <span className="text-slate-500">Submissions</span>
-                    <span className="text-right font-medium text-slate-800">{course.submissions}</span>
-                    <span className="text-slate-500">Pending Reviews</span>
-                    <span className="text-right font-medium text-slate-800">{course.pendingReviews}</span>
-                    <span className="text-slate-500">Average Similarity</span>
-                    <span className="text-right">
-                      <SimilarityValue value={course.averageSimilarity} />
-                    </span>
+                    <Link
+                      to={`/professor/submissions?course_id=${course.id}`}
+                      className="block w-full text-center rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                    >
+                      View Submissions
+                    </Link>
                   </div>
-
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-500 hover:bg-emerald-50 transition-colors"
-                  >
-                    View Course
-                  </button>
                 </div>
               ))}
-            </section>
-          ) : (
-            <section className="rounded-2xl border border-slate-200 bg-white px-6 py-16 flex flex-col items-center text-center">
-              <div className="rounded-full bg-slate-100 p-3 text-slate-400">
-                {icons.emptyBox({ className: "h-7 w-7" })}
+            </div>
+          )}
+
+          {/* Modal */}
+          {modalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-slate-900">Add New Course</h3>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    {icons.close({ className: "h-5 w-5" })}
+                  </button>
+                </div>
+
+                {formErrors.form && (
+                  <div className="mb-4 rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700 border border-red-200">
+                    {formErrors.form}
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateCourse} className="space-y-4">
+                  <div>
+                    <label htmlFor="course-code" className="block text-xs font-semibold text-slate-700 mb-1">
+                      Course Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="course-code"
+                      type="text"
+                      placeholder="e.g. CS405"
+                      value={formValues.code}
+                      onChange={handleFormChange("code")}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 ${
+                        formErrors.code
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-slate-200 focus:ring-emerald-500/40"
+                      }`}
+                    />
+                    {formErrors.code && <p className="mt-1 text-xs text-red-500">{formErrors.code}</p>}
+                  </div>
+
+                  <div>
+                    <label htmlFor="course-name" className="block text-xs font-semibold text-slate-700 mb-1">
+                      Course Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="course-name"
+                      type="text"
+                      placeholder="e.g. Deep Learning & Neural Networks"
+                      value={formValues.name}
+                      onChange={handleFormChange("name")}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 ${
+                        formErrors.name
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-slate-200 focus:ring-emerald-500/40"
+                      }`}
+                    />
+                    {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
+                  </div>
+
+                  <div>
+                    <label htmlFor="course-desc" className="block text-xs font-semibold text-slate-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      id="course-desc"
+                      rows={3}
+                      placeholder="Course overview and syllabus highlights..."
+                      value={formValues.description}
+                      onChange={handleFormChange("description")}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 resize-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 shadow-sm disabled:opacity-50"
+                    >
+                      {isSubmitting ? "Creating..." : "Create Course"}
+                    </button>
+                  </div>
+                </form>
               </div>
-              <p className="mt-4 text-sm font-semibold text-slate-900">No courses found</p>
-              <p className="mt-1 text-sm text-slate-500">
-                Try changing your search or filters.
-              </p>
-            </section>
+            </div>
           )}
         </main>
       </div>
-
-      {/* Create Course modal */}
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-course-title"
-        >
-          <div className="w-full max-w-md rounded-2xl bg-white px-6 py-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <h2 id="create-course-title" className="text-lg font-semibold text-slate-900">
-                Create Course
-              </h2>
-              <button
-                type="button"
-                onClick={closeModal}
-                aria-label="Close create course dialog"
-                className="p-1 text-slate-400 hover:text-slate-600"
-              >
-                {icons.close({ className: "h-5 w-5" })}
-              </button>
-            </div>
-
-            <form className="mt-5 space-y-4" onSubmit={handleCreateCourse} noValidate>
-              <div>
-                <label htmlFor="course-code" className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Course Code
-                </label>
-                <input
-                  id="course-code"
-                  type="text"
-                  value={formValues.code}
-                  onChange={handleFormChange("code")}
-                  placeholder="e.g. CS405"
-                  aria-invalid={Boolean(formErrors.code)}
-                  aria-describedby={formErrors.code ? "course-code-error" : undefined}
-                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${
-                    formErrors.code ? "border-red-400" : "border-slate-300 focus:border-emerald-500"
-                  }`}
-                />
-                {formErrors.code && (
-                  <p id="course-code-error" className="mt-1.5 text-sm text-red-600">
-                    {formErrors.code}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="course-name" className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Course Name
-                </label>
-                <input
-                  id="course-name"
-                  type="text"
-                  value={formValues.name}
-                  onChange={handleFormChange("name")}
-                  placeholder="e.g. Natural Language Processing"
-                  aria-invalid={Boolean(formErrors.name)}
-                  aria-describedby={formErrors.name ? "course-name-error" : undefined}
-                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${
-                    formErrors.name ? "border-red-400" : "border-slate-300 focus:border-emerald-500"
-                  }`}
-                />
-                {formErrors.name && (
-                  <p id="course-name-error" className="mt-1.5 text-sm text-red-600">
-                    {formErrors.name}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="course-description" className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Description
-                </label>
-                <textarea
-                  id="course-description"
-                  rows={3}
-                  value={formValues.description}
-                  onChange={handleFormChange("description")}
-                  placeholder="Enter a short course description"
-                  className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 focus:border-emerald-500 resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors"
-                >
-                  Create Course
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -117,3 +117,52 @@ export async function getStudentSubmissions() {
     method: "GET",
   });
 }
+
+/**
+ * Get professor dashboard summary metrics, profile, course overview, and recent submissions.
+ */
+export async function getProfessorDashboard() {
+  return apiRequest("/api/professor/dashboard", {
+    method: "GET",
+  });
+}
+
+/**
+ * Get all submissions for courses taught by the logged-in professor.
+ */
+export async function getProfessorSubmissions(courseId = null) {
+  const query = courseId ? `?course_id=${encodeURIComponent(courseId)}` : "";
+  return apiRequest(`/api/professor/submissions${query}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Get all courses taught by the logged-in professor with live stats.
+ */
+export async function getProfessorCourses() {
+  return apiRequest("/api/professor/courses", {
+    method: "GET",
+  });
+}
+
+/**
+ * Create a new academic course (professor only).
+ */
+export async function createCourse({ name, code, description }) {
+  return apiRequest("/api/courses", {
+    method: "POST",
+    body: JSON.stringify({ name, code, description }),
+  });
+}
+
+/**
+ * Submit professor review decision and feedback for a plagiarism report.
+ */
+export async function updateReportReview(reportId, { review_status, professor_feedback }) {
+  return apiRequest(`/api/reports/${reportId}/review`, {
+    method: "PUT",
+    body: JSON.stringify({ review_status, professor_feedback }),
+  });
+}
+

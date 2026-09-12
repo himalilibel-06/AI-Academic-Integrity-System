@@ -176,3 +176,34 @@ def seed_default_courses_if_empty(connection):
         cursor.execute("SELECT id FROM courses WHERE code = ?", (code,))
         if not cursor.fetchone():
             create_course(connection, name, code, description, prof_id)
+
+
+def get_professor_courses_with_stats(connection, professor_id):
+    """
+    Get all courses taught by a professor along with dynamic metrics:
+    enrolled students count, submission count, pending reviews count, and average similarity score.
+    """
+    cursor = connection.cursor()
+
+    query = """
+        SELECT c.id, c.name, c.code, c.description, c.professor_id, c.created_at,
+               COUNT(DISTINCT ce.student_id) AS student_count,
+               COUNT(DISTINCT s.id) AS submission_count,
+               COUNT(DISTINCT CASE
+                   WHEN s.status IN ('pending', 'processing', 'review_required')
+                     OR r.review_status IN ('pending', 'review_required')
+                     OR r.risk_level IN ('review_required', 'high_risk')
+                   THEN s.id
+               END) AS pending_reviews,
+               COALESCE(ROUND(AVG(r.overall_similarity_score), 1), 0.0) AS avg_similarity
+        FROM courses c
+        LEFT JOIN course_enrollments ce ON c.id = ce.course_id
+        LEFT JOIN submissions s ON c.id = s.course_id
+        LEFT JOIN plagiarism_reports r ON s.id = r.submission_id
+        WHERE c.professor_id = ?
+        GROUP BY c.id
+        ORDER BY c.created_at DESC, c.id DESC
+    """
+    cursor.execute(query, (professor_id,))
+    return cursor.fetchall()
+

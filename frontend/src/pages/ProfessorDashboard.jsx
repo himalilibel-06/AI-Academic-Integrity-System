@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { getProfessorDashboard } from "../service/api";
 
 /* ---------------------------------------------------------
    Inline icons (no extra dependency)
@@ -99,85 +101,6 @@ const icons = {
   ),
 };
 
-/* ---------------------------------------------------------
-   Mock data — replace with API data once the backend is live
---------------------------------------------------------- */
-const professor = {
-  name: "Dr. Anitha Kumar",
-  email: "professor@example.com",
-  initials: "AK",
-};
-
-const summaryStats = [
-  { label: "Total Submissions", value: 128, note: "Across all courses", icon: icons.submissions },
-  { label: "Completed", value: 104, note: "Review finalized", icon: icons.docCheck },
-  { label: "Processing", value: 8, note: "Awaiting analysis", icon: icons.clock },
-  { label: "Review Required", value: 12, note: "Needs professor input", icon: icons.flag },
-  { label: "High Similarity", value: 4, note: "Similarity detected", icon: icons.alert },
-];
-
-const reviewRequired = [
-  {
-    id: 1,
-    student: "Arun Kumar",
-    assignment: "AI Ethics Assignment",
-    course: "CS402 - Artificial Intelligence",
-    date: "Sep 10, 2026",
-    similarity: 46,
-    status: "High Similarity",
-  },
-  {
-    id: 2,
-    student: "Priya Sharma",
-    assignment: "Neural Networks Report",
-    course: "CS420 - Machine Learning",
-    date: "Sep 9, 2026",
-    similarity: 38,
-    status: "Review Required",
-  },
-  {
-    id: 3,
-    student: "Rohit Verma",
-    assignment: "Database Design Proposal",
-    course: "CS305 - Database Systems",
-    date: "Sep 8, 2026",
-    similarity: 51,
-    status: "High Similarity",
-  },
-  {
-    id: 4,
-    student: "Sneha Reddy",
-    assignment: "Operating Systems Case Study",
-    course: "CS310 - Operating Systems",
-    date: "Sep 7, 2026",
-    similarity: 34,
-    status: "Review Required",
-  },
-];
-
-const recentSubmissions = [
-  { id: 1, student: "Arun Kumar", assignment: "AI Ethics Assignment", course: "CS402", date: "Sep 10, 2026", similarity: 46, status: "High Similarity" },
-  { id: 2, student: "Meera Nair", assignment: "Search Algorithms Report", course: "CS402", date: "Sep 10, 2026", similarity: 8, status: "Completed" },
-  { id: 3, student: "Priya Sharma", assignment: "Neural Networks Report", course: "CS420", date: "Sep 9, 2026", similarity: 38, status: "Review Required" },
-  { id: 4, student: "Karthik Iyer", assignment: "Compiler Design Exercise", course: "CS315", date: "Sep 9, 2026", similarity: 14, status: "Completed" },
-  { id: 5, student: "Divya Menon", assignment: "Cloud Architecture Report", course: "CS440", date: "Sep 8, 2026", similarity: 21, status: "Completed" },
-  { id: 6, student: "Rohit Verma", assignment: "Database Design Proposal", course: "CS305", date: "Sep 8, 2026", similarity: 51, status: "High Similarity" },
-];
-
-const courseOverview = [
-  { code: "CS402", name: "Artificial Intelligence", students: 42, submissions: 38, pendingReview: 4, similarityReviews: 7 },
-  { code: "CS420", name: "Machine Learning", students: 35, submissions: 30, pendingReview: 3, similarityReviews: 5 },
-  { code: "CS305", name: "Database Systems", students: 48, submissions: 44, pendingReview: 3, similarityReviews: 4 },
-  { code: "CS310", name: "Operating Systems", students: 39, submissions: 33, pendingReview: 2, similarityReviews: 3 },
-];
-
-const similarityOverview = [
-  { label: "Low Similarity", value: 65, color: "bg-green-500" },
-  { label: "Moderate Similarity", value: 20, color: "bg-amber-500" },
-  { label: "Review Required", value: 10, color: "bg-amber-500" },
-  { label: "High Similarity", value: 5, color: "bg-red-500" },
-];
-
 const navItems = [
   { label: "Dashboard", icon: icons.dashboard, to: "/professor/dashboard" },
   { label: "Submissions", icon: icons.submissions, to: "/professor/submissions" },
@@ -199,6 +122,7 @@ const quickActions = [
 function StatusBadge({ status }) {
   const styles = {
     Completed: "bg-green-50 text-green-700 border-green-200",
+    Reviewed: "bg-emerald-50 text-emerald-700 border-emerald-200",
     Processing: "bg-blue-50 text-blue-700 border-blue-200",
     "Review Required": "bg-amber-50 text-amber-700 border-amber-200",
     "High Similarity": "bg-red-50 text-red-700 border-red-200",
@@ -215,13 +139,81 @@ function StatusBadge({ status }) {
 }
 
 function SimilarityValue({ value }) {
+  if (value === null || value === undefined) {
+    return <span className="text-sm text-slate-400">—</span>;
+  }
   const color =
     value < 20 ? "text-green-600" : value < 40 ? "text-amber-600" : "text-red-600";
   return <span className={`text-sm font-semibold ${color}`}>{value}%</span>;
 }
 
 export default function ProfessorDashboard() {
+  const { user, logout } = useAuth();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getProfessorDashboard();
+      if (data && data.success) {
+        setDashboardData(data);
+      } else {
+        setError("Failed to load professor dashboard metrics.");
+      }
+    } catch (err) {
+      setError(err.message || "Failed to connect to the academic server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const professorInfo = dashboardData?.professor || {
+    name: user?.name || "Professor",
+    email: user?.email || "",
+    initials: user?.name
+      ? user.name
+          .split(" ")
+          .filter(Boolean)
+          .map((p) => p[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase()
+      : "PR",
+  };
+
+  const stats = dashboardData?.stats || {
+    total_submissions: 0,
+    completed: 0,
+    processing: 0,
+    review_required: 0,
+    high_similarity: 0,
+  };
+
+  const summaryStats = [
+    { label: "Total Submissions", value: stats.total_submissions, note: "Across your courses", icon: icons.submissions },
+    { label: "Completed", value: stats.completed, note: "Review finalized", icon: icons.docCheck },
+    { label: "Processing", value: stats.processing, note: "Awaiting analysis", icon: icons.clock },
+    { label: "Review Required", value: stats.review_required, note: "Needs professor input", icon: icons.flag },
+    { label: "High Similarity", value: stats.high_similarity, note: "Similarity > 40%", icon: icons.alert },
+  ];
+
+  const reviewRequired = dashboardData?.review_required || [];
+  const recentSubmissions = dashboardData?.recent_submissions || [];
+  const courseOverview = dashboardData?.course_overview || [];
+  const similarityOverview = dashboardData?.similarity_overview || [
+    { label: "Low Similarity", value: 0, color: "bg-green-500" },
+    { label: "Moderate Similarity", value: 0, color: "bg-amber-500" },
+    { label: "High Similarity", value: 0, color: "bg-red-500" },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 lg:flex">
@@ -237,7 +229,7 @@ export default function ProfessorDashboard() {
         </button>
         <span className="text-sm font-semibold text-slate-900">AI Academic Integrity</span>
         <div className="h-8 w-8 rounded-full bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center">
-          {professor.initials}
+          {professorInfo.initials}
         </div>
       </div>
 
@@ -294,7 +286,8 @@ export default function ProfessorDashboard() {
 
         <button
           type="button"
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white"
+          onClick={logout}
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
         >
           {icons.logout({ className: "h-5 w-5" })}
           Logout
@@ -322,266 +315,368 @@ export default function ProfessorDashboard() {
             </button>
             <div className="flex items-center gap-3 border-l border-slate-200 pl-5">
               <div className="h-9 w-9 rounded-full bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center">
-                {professor.initials}
+                {professorInfo.initials}
               </div>
               <div className="text-sm">
-                <p className="font-medium text-slate-900 leading-tight">{professor.name}</p>
-                <p className="text-slate-500 leading-tight">{professor.email}</p>
+                <p className="font-medium text-slate-900 leading-tight">{professorInfo.name}</p>
+                <p className="text-slate-500 leading-tight">{professorInfo.email}</p>
               </div>
             </div>
           </div>
         </header>
 
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8 space-y-6">
-          {/* Welcome section */}
-          <section className="rounded-2xl border border-slate-200 bg-white px-6 py-7 sm:px-8 sm:py-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Welcome back, Professor</h2>
-              <p className="mt-1 text-sm text-slate-500 max-w-md">
-                Review your students&apos; submissions and monitor similarity results.
-              </p>
-            </div>
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-sm font-medium text-slate-600 whitespace-nowrap">
-              Semester: 2026
-            </span>
-          </section>
-
-          {/* Statistics */}
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {summaryStats.map((stat) => (
-              <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-slate-500">{stat.label}</p>
-                    <p className="mt-1.5 text-2xl font-semibold text-slate-900">{stat.value}</p>
-                  </div>
-                  <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500">
-                    {stat.icon({ className: "h-5 w-5" })}
-                  </div>
-                </div>
-                <p className="mt-3 text-xs text-slate-400">{stat.note}</p>
-              </div>
-            ))}
-          </section>
-
-          {/* Submissions requiring review */}
-          <section className="rounded-2xl border border-amber-200 bg-amber-50/40">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-amber-200/70">
-              <div className="flex items-center gap-2">
-                {icons.flag({ className: "h-5 w-5 text-amber-600" })}
-                <h3 className="text-base font-semibold text-slate-900">
-                  Submissions Requiring Review
-                </h3>
-              </div>
-              <Link
-                to="/professor/submissions"
-                className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
+          {/* Error Banner */}
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center justify-between">
+              <p>{error}</p>
+              <button
+                type="button"
+                onClick={loadDashboard}
+                className="font-semibold underline hover:text-red-900 ml-4"
               >
-                View all
-              </Link>
+                Retry
+              </button>
             </div>
-            <div className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2 xl:grid-cols-4">
-              {reviewRequired.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-4 flex flex-col gap-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{item.student}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{item.assignment}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">{item.course}</p>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <SimilarityValue value={item.similarity} />
-                    <StatusBadge status={item.status} />
-                  </div>
-                  <p className="text-xs text-slate-400">Submitted {item.date}</p>
+          )}
+
+          {/* Loading Indicator */}
+          {loading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+              <svg
+                className="mx-auto h-8 w-8 animate-spin text-emerald-600"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              <p className="mt-4 text-sm font-medium text-slate-700">Loading professor dashboard...</p>
+            </div>
+          ) : (
+            <>
+              {/* Welcome section */}
+              <section className="rounded-2xl border border-slate-200 bg-white px-6 py-7 sm:px-8 sm:py-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Welcome back, {professorInfo.name.split(" ")[0]}!
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500 max-w-md">
+                    Review your students&apos; submissions and monitor similarity results across your courses.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
                   <Link
-                    to={`/professor/reports/${item.id}`}
-                    className="mt-1 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors"
+                    to="/professor/courses"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
                   >
-                    Review Report
+                    {icons.courses({ className: "h-4 w-4 text-slate-500" })}
+                    Manage Courses
+                  </Link>
+                  <Link
+                    to="/professor/submissions"
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition"
+                  >
+                    {icons.submissions({ className: "h-4 w-4" })}
+                    Review Submissions
                   </Link>
                 </div>
-              ))}
-            </div>
-          </section>
+              </section>
 
-          {/* Recent submissions */}
-          <section className="rounded-2xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-              <h3 className="text-base font-semibold text-slate-900">Recent Submissions</h3>
-              <Link
-                to="/professor/submissions"
-                className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
-              >
-                View all
-              </Link>
-            </div>
-
-            {/* Desktop table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="text-slate-500 border-b border-slate-200">
-                    <th className="px-6 py-3 font-medium">Student</th>
-                    <th className="px-4 py-3 font-medium">Assignment</th>
-                    <th className="px-4 py-3 font-medium">Course</th>
-                    <th className="px-4 py-3 font-medium">Submitted</th>
-                    <th className="px-4 py-3 font-medium">Similarity</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-6 py-3 font-medium text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentSubmissions.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-6 py-4 text-slate-900 font-medium">{item.student}</td>
-                      <td className="px-4 py-4 text-slate-600">{item.assignment}</td>
-                      <td className="px-4 py-4 text-slate-600">{item.course}</td>
-                      <td className="px-4 py-4 text-slate-600">{item.date}</td>
-                      <td className="px-4 py-4">
-                        <SimilarityValue value={item.similarity} />
-                      </td>
-                      <td className="px-4 py-4">
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <Link
-                          to={`/professor/reports/${item.id}`}
-                          className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
-                        >
-                          View Report
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile card list */}
-            <div className="md:hidden divide-y divide-slate-100">
-              {recentSubmissions.map((item) => (
-                <div key={item.id} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{item.student}</p>
-                      <p className="text-xs text-slate-500">{item.assignment}</p>
+              {/* Statistics */}
+              <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                {summaryStats.map((stat) => (
+                  <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm text-slate-500">{stat.label}</p>
+                        <p className="mt-1.5 text-2xl font-semibold text-slate-900">{stat.value}</p>
+                      </div>
+                      <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500">
+                        {stat.icon({ className: "h-5 w-5" })}
+                      </div>
                     </div>
-                    <StatusBadge status={item.status} />
+                    <p className="mt-3 text-xs text-slate-400">{stat.note}</p>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">{item.course}</p>
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="text-xs text-slate-500">
-                      <span>{item.date}</span>
-                      <span className="mx-2">•</span>
-                      <SimilarityValue value={item.similarity} />
-                    </div>
-                    <Link
-                      to={`/professor/reports/${item.id}`}
-                      className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
-                    >
-                      View Report
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                ))}
+              </section>
 
-          {/* Course overview + Similarity overview */}
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white px-6 py-5">
-              <h3 className="text-base font-semibold text-slate-900 mb-4">Course Overview</h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {courseOverview.map((course) => (
-                  <div
-                    key={course.code}
-                    className="rounded-xl border border-slate-200 px-4 py-4 flex flex-col gap-3"
+              {/* Submissions requiring review */}
+              <section className="rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-amber-200/70">
+                  <div className="flex items-center gap-2">
+                    {icons.flag({ className: "h-5 w-5 text-amber-600" })}
+                    <h3 className="text-base font-semibold text-slate-900">
+                      Submissions Requiring Review
+                    </h3>
+                  </div>
+                  <Link
+                    to="/professor/submissions"
+                    className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
                   >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{course.code}</p>
-                      <p className="text-xs text-slate-500">{course.name}</p>
+                    View all
+                  </Link>
+                </div>
+
+                {reviewRequired.length === 0 ? (
+                  <div className="px-6 py-8 text-center text-sm text-slate-500">
+                    No submissions currently flagged or requiring urgent review. All submissions are up to date.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2 xl:grid-cols-4">
+                    {reviewRequired.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-4 flex flex-col gap-3 shadow-sm"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{item.student}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">{item.assignment}</p>
+                          <p className="mt-0.5 text-xs text-slate-400">{item.course}</p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <SimilarityValue value={item.similarity} />
+                          <StatusBadge status={item.status} />
+                        </div>
+                        <p className="text-xs text-slate-400">Submitted {item.date}</p>
+                        <Link
+                          to={item.report_id ? `/professor/reports/${item.report_id}` : "/professor/submissions"}
+                          className="mt-1 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors"
+                        >
+                          Review Report
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Recent submissions */}
+              <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+                  <h3 className="text-base font-semibold text-slate-900">Recent Submissions</h3>
+                  <Link
+                    to="/professor/submissions"
+                    className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
+                  >
+                    View all
+                  </Link>
+                </div>
+
+                {recentSubmissions.length === 0 ? (
+                  <div className="px-6 py-12 text-center">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                      {icons.submissions({ className: "h-6 w-6" })}
                     </div>
-                    <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-500">
-                      <span>Students</span>
-                      <span className="text-right font-medium text-slate-800">{course.students}</span>
-                      <span>Submissions</span>
-                      <span className="text-right font-medium text-slate-800">{course.submissions}</span>
-                      <span>Pending Review</span>
-                      <span className="text-right font-medium text-slate-800">{course.pendingReview}</span>
-                      <span>Similarity Reviews</span>
-                      <span className="text-right font-medium text-slate-800">{course.similarityReviews}</span>
+                    <p className="text-sm font-semibold text-slate-900">No submissions yet</p>
+                    <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
+                      Student submissions for your courses will appear here once submitted.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                            <th className="px-6 py-3 font-medium">Student</th>
+                            <th className="px-4 py-3 font-medium">Assignment</th>
+                            <th className="px-4 py-3 font-medium">Course</th>
+                            <th className="px-4 py-3 font-medium">Submitted</th>
+                            <th className="px-4 py-3 font-medium">Similarity</th>
+                            <th className="px-4 py-3 font-medium">Status</th>
+                            <th className="px-6 py-3 font-medium text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentSubmissions.map((item) => (
+                            <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                              <td className="px-6 py-4 text-slate-900 font-medium">{item.student}</td>
+                              <td className="px-4 py-4 text-slate-600">{item.assignment}</td>
+                              <td className="px-4 py-4 text-slate-600">{item.course}</td>
+                              <td className="px-4 py-4 text-slate-600">{item.date}</td>
+                              <td className="px-4 py-4">
+                                <SimilarityValue value={item.similarity} />
+                              </td>
+                              <td className="px-4 py-4">
+                                <StatusBadge status={item.status} />
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <Link
+                                  to={item.report_id ? `/professor/reports/${item.report_id}` : "/professor/submissions"}
+                                  className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
+                                >
+                                  View Report
+                                </Link>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
+
+                    {/* Mobile card list */}
+                    <div className="md:hidden divide-y divide-slate-100">
+                      {recentSubmissions.map((item) => (
+                        <div key={item.id} className="px-5 py-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">{item.student}</p>
+                              <p className="text-xs text-slate-500">{item.assignment}</p>
+                            </div>
+                            <StatusBadge status={item.status} />
+                          </div>
+                          <p className="mt-1 text-xs text-slate-400">{item.course}</p>
+                          <div className="mt-3 flex items-center justify-between">
+                            <div className="text-xs text-slate-500">
+                              <span>{item.date}</span>
+                              <span className="mx-2">•</span>
+                              <SimilarityValue value={item.similarity} />
+                            </div>
+                            <Link
+                              to={item.report_id ? `/professor/reports/${item.report_id}` : "/professor/submissions"}
+                              className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
+                            >
+                              View Report
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
+
+              {/* Course overview + Similarity overview */}
+              <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-semibold text-slate-900">Course Overview</h3>
                     <Link
                       to="/professor/courses"
-                      className="mt-1 text-sm font-medium text-emerald-500 hover:text-emerald-600"
+                      className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
                     >
-                      View Course
+                      Manage
                     </Link>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5">
-              <h3 className="text-base font-semibold text-slate-900 mb-4">Similarity Overview</h3>
-              <div className="space-y-4">
-                {similarityOverview.map((row) => (
-                  <div key={row.label}>
-                    <div className="flex items-center justify-between text-sm mb-1.5">
-                      <span className="text-slate-600">{row.label}</span>
-                      <span className="font-medium text-slate-800">{row.value}%</span>
+                  {courseOverview.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-slate-500">
+                      <p>You have not created any courses yet.</p>
+                      <Link
+                        to="/professor/courses"
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:underline"
+                      >
+                        Create your first course &rarr;
+                      </Link>
                     </div>
-                    <div className="h-2 w-full rounded-full bg-slate-100">
-                      <div
-                        className={`h-2 rounded-full ${row.color}`}
-                        style={{ width: `${row.value}%` }}
-                      />
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {courseOverview.map((course) => (
+                        <div
+                          key={course.code}
+                          className="rounded-xl border border-slate-200 px-4 py-4 flex flex-col gap-3 hover:border-emerald-300 transition"
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{course.code}</p>
+                            <p className="text-xs text-slate-500">{course.name}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-500">
+                            <span>Students</span>
+                            <span className="text-right font-medium text-slate-800">{course.students}</span>
+                            <span>Submissions</span>
+                            <span className="text-right font-medium text-slate-800">{course.submissions}</span>
+                            <span>Pending Review</span>
+                            <span className="text-right font-medium text-slate-800">{course.pendingReview}</span>
+                            <span>Avg Similarity</span>
+                            <span className="text-right font-medium text-slate-800">{course.averageSimilarity || 0}%</span>
+                          </div>
+                          <Link
+                            to={`/professor/submissions?course_id=${course.id}`}
+                            className="mt-1 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+                          >
+                            View Submissions &rarr;
+                          </Link>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+                  )}
+                </div>
 
-          {/* Academic review guidance */}
-          <section className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-5 py-4 flex gap-3">
-            <div className="text-emerald-500 flex-shrink-0">
-              {icons.info({ className: "h-5 w-5" })}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-emerald-900">Academic Review Guidance</p>
-              <p className="mt-1 text-sm text-emerald-900/80 leading-relaxed">
-                Similarity scores are indicators of matching content and should not be treated as
-                automatic proof of plagiarism. Review the matched sources, context and assignment
-                requirements before making an academic decision.
-              </p>
-            </div>
-          </section>
+                <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+                  <h3 className="text-base font-semibold text-slate-900 mb-4">Similarity Overview</h3>
+                  <div className="space-y-4">
+                    {similarityOverview.map((row) => (
+                      <div key={row.label}>
+                        <div className="flex items-center justify-between text-sm mb-1.5">
+                          <span className="text-slate-600">{row.label}</span>
+                          <span className="font-medium text-slate-800">
+                            {row.value}% {row.count !== undefined ? `(${row.count})` : ""}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-100">
+                          <div
+                            className={`h-2 rounded-full ${row.color}`}
+                            style={{ width: `${Math.min(row.value, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
 
-          {/* Quick actions */}
-          <section>
-            <h3 className="text-base font-semibold text-slate-900 mb-3">Quick Actions</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {quickActions.map((action) => (
-                <Link
-                  key={action.label}
-                  to={action.to}
-                  className="rounded-2xl border border-slate-200 bg-white px-5 py-5 flex items-start gap-3 hover:border-emerald-400 hover:shadow-sm transition-all"
-                >
-                  <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500 flex-shrink-0">
-                    {action.icon({ className: "h-5 w-5" })}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{action.label}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{action.description}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
+              {/* Academic review guidance */}
+              <section className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-5 py-4 flex gap-3">
+                <div className="text-emerald-500 flex-shrink-0">
+                  {icons.info({ className: "h-5 w-5" })}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900">Academic Review Guidance</p>
+                  <p className="mt-1 text-sm text-emerald-900/80 leading-relaxed">
+                    Similarity scores are indicators of matching content and should not be treated as
+                    automatic proof of plagiarism. Review the matched sources, context and assignment
+                    requirements before making an academic decision.
+                  </p>
+                </div>
+              </section>
+
+              {/* Quick actions */}
+              <section>
+                <h3 className="text-base font-semibold text-slate-900 mb-3">Quick Actions</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {quickActions.map((action) => (
+                    <Link
+                      key={action.label}
+                      to={action.to}
+                      className="rounded-2xl border border-slate-200 bg-white px-5 py-5 flex items-start gap-3 hover:border-emerald-400 hover:shadow-sm transition-all shadow-sm"
+                    >
+                      <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500 flex-shrink-0">
+                        {action.icon({ className: "h-5 w-5" })}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{action.label}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{action.description}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
         </main>
       </div>
     </div>
