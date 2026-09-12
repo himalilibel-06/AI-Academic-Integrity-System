@@ -1,9 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database.database import initialize_database
+from database.database import initialize_database, get_connection
+from models.course import seed_default_courses_if_empty
 from routes.auth import router as auth_router
 from routes.analysis import router as analysis_router
+from routes.submissions import router as submissions_router
+from routes.reports import router as reports_router
+from routes.courses import router as courses_router
 
 
 app = FastAPI(
@@ -25,12 +29,20 @@ app.add_middleware(
 )
 
 
-# Create database tables when the backend starts
+# Create database tables and seed initial course records when backend starts
 initialize_database()
+db_conn = get_connection()
+try:
+    seed_default_courses_if_empty(db_conn)
+finally:
+    db_conn.close()
 
 
 # Include application routers
 app.include_router(auth_router)
+app.include_router(submissions_router)
+app.include_router(reports_router)
+app.include_router(courses_router)
 app.include_router(analysis_router)
 
 

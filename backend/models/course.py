@@ -89,3 +89,90 @@ def get_student_courses(connection, student_id):
     )
 
     return cursor.fetchall()
+
+
+def get_all_courses(connection):
+    """
+    Get all courses available in the system.
+    """
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, name, code, description, professor_id, created_at
+        FROM courses
+        ORDER BY code ASC
+        """
+    )
+
+    return cursor.fetchall()
+
+
+def get_course_by_id_or_code(connection, identifier):
+    """
+    Find a course by its numeric ID or course code (e.g. 'CS402' or 2).
+    """
+    cursor = connection.cursor()
+
+    # Try numeric ID first
+    try:
+        numeric_id = int(identifier)
+        cursor.execute(
+            """
+            SELECT id, name, code, description, professor_id, created_at
+            FROM courses
+            WHERE id = ?
+            """,
+            (numeric_id,)
+        )
+        course = cursor.fetchone()
+        if course:
+            return course
+    except (ValueError, TypeError):
+        pass
+
+    # Try matching course code
+    cursor.execute(
+        """
+        SELECT id, name, code, description, professor_id, created_at
+        FROM courses
+        WHERE UPPER(code) = UPPER(?)
+        """,
+        (str(identifier).strip(),)
+    )
+    return cursor.fetchone()
+
+
+def seed_default_courses_if_empty(connection):
+    """
+    Seed initial academic courses for testing/development if courses do not yet exist.
+    """
+    cursor = connection.cursor()
+
+    # Look for an existing professor or create a default instructor
+    cursor.execute("SELECT id FROM users WHERE role = 'professor' LIMIT 1")
+    prof_row = cursor.fetchone()
+
+    if prof_row:
+        prof_id = prof_row[0]
+    else:
+        from models.user import create_user
+        prof_id = create_user(
+            connection,
+            name="Dr. Anitha Kumar",
+            email="instructor_phase4@example.com",
+            password="securepassword123",
+            role="professor"
+        )
+
+    default_courses = [
+        ("Machine Learning", "CS401", "Introduction to Machine Learning and Data Analysis"),
+        ("Artificial Intelligence", "CS402", "Artificial Intelligence Concepts and Reasoning"),
+        ("Database Management", "CS403", "Relational Databases and SQL"),
+        ("Computer Networks", "CS404", "Computer Networking and Protocols"),
+    ]
+
+    for name, code, description in default_courses:
+        cursor.execute("SELECT id FROM courses WHERE code = ?", (code,))
+        if not cursor.fetchone():
+            create_course(connection, name, code, description, prof_id)

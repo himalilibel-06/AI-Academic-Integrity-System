@@ -107,3 +107,26 @@ def update_submission_status(connection, submission_id, status):
 
     connection.commit()
     return cursor.rowcount
+
+
+def get_submission_with_details(connection, submission_id):
+    """
+    Get a single submission record with joined course and student information.
+    """
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT s.id, s.student_id, s.course_id, s.title, s.filename, s.file_path,
+               s.file_type, s.original_text, s.processed_text, s.status, s.submitted_at,
+               c.name AS course_name, c.code AS course_code,
+               u.name AS student_name, u.email AS student_email
+        FROM submissions s
+        LEFT JOIN courses c ON s.course_id = c.id
+        LEFT JOIN users u ON s.student_id = u.id
+        WHERE s.id = ?
+        """,
+        (submission_id,)
+    )
+
+    return cursor.fetchone()

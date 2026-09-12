@@ -96,6 +96,7 @@ export default function App() {
           <Route path="/student/upload" element={<ProtectedRoute allowedRoles={["student"]}><UploadSubmission /></ProtectedRoute>} />
           <Route path="/student/submissions" element={<ProtectedRoute allowedRoles={["student"]}><MySubmissions /></ProtectedRoute>} />
           <Route path="/student/reports" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
+          <Route path="/student/reports/:id" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
           <Route path="/student/profile" element={<ProtectedRoute allowedRoles={["student"]}><Profile /></ProtectedRoute>} />
           <Route path="/student/settings" element={<ProtectedRoute allowedRoles={["student"]}><Settings /></ProtectedRoute>} />
 

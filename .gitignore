@@ -76,3 +76,7 @@ htmlcov/
 *.tmp
 *.temp
 *.bak
+
+# Uploaded documents
+backend/uploads/*
+!backend/uploads/.gitkeep

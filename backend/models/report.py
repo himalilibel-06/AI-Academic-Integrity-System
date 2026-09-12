@@ -76,3 +76,44 @@ def update_report_review(
 
     connection.commit()
     return cursor.rowcount
+
+
+def get_report_by_id(connection, report_id):
+    """
+    Fetch plagiarism report by report ID.
+    """
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, submission_id, overall_similarity_score, risk_level, matches,
+               review_status, professor_feedback, reviewed_by, reviewed_at, created_at
+        FROM plagiarism_reports
+        WHERE id = ?
+        """,
+        (report_id,)
+    )
+
+    return cursor.fetchone()
+
+
+def get_latest_report_by_student(connection, student_id):
+    """
+    Fetch the latest plagiarism report submitted by a specific student.
+    """
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT r.id, r.submission_id, r.overall_similarity_score, r.risk_level, r.matches,
+               r.review_status, r.professor_feedback, r.reviewed_by, r.reviewed_at, r.created_at
+        FROM plagiarism_reports r
+        JOIN submissions s ON r.submission_id = s.id
+        WHERE s.student_id = ?
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT 1
+        """,
+        (student_id,)
+    )
+
+    return cursor.fetchone()

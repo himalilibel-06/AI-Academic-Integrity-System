@@ -7,9 +7,13 @@ export async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem("auth_token");
   
   const headers = {
-    "Content-Type": "application/json",
     ...options.headers,
   };
+
+  // Only default to application/json when body is not FormData
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+  }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -55,6 +59,43 @@ export async function loginUser({ email, password }) {
  */
 export async function getCurrentUser() {
   return apiRequest("/api/auth/me", {
+    method: "GET",
+  });
+}
+
+/**
+ * Submit an assignment document for plagiarism similarity analysis.
+ */
+export async function submitAssignment(formData) {
+  return apiRequest("/api/submissions", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+/**
+ * Get a specific plagiarism report by ID.
+ */
+export async function getPlagiarismReport(reportId) {
+  return apiRequest(`/api/reports/${reportId}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Get the latest plagiarism report for the logged-in student.
+ */
+export async function getLatestPlagiarismReport() {
+  return apiRequest("/api/reports/latest", {
+    method: "GET",
+  });
+}
+
+/**
+ * Get all available courses.
+ */
+export async function getCourses() {
+  return apiRequest("/api/courses", {
     method: "GET",
   });
 }

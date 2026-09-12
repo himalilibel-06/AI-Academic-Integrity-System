@@ -1,5 +1,7 @@
-import { useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { submitAssignment, getCourses } from "../service/api";
 
 const COURSE_OPTIONS = [
   { value: "CS401", label: "CS401 - Machine Learning" },
@@ -45,7 +47,11 @@ function getFileTypeLabel(fileName) {
 }
 
 export default function UploadSubmission() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
   const [course, setCourse] = useState("");
+  const [coursesList, setCoursesList] = useState(COURSE_OPTIONS);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -56,6 +62,29 @@ export default function UploadSubmission() {
   const [submittedInfo, setSubmittedInfo] = useState(null);
 
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadCourses() {
+      try {
+        const response = await getCourses();
+        if (isMounted && response && response.courses && response.courses.length > 0) {
+          const mapped = response.courses.map((c) => ({
+            value: String(c.id),
+            label: `${c.code} - ${c.name}`,
+            code: c.code,
+          }));
+          setCoursesList(mapped);
+        }
+      } catch (err) {
+        console.warn("Could not load backend courses list; falling back to default courses.", err);
+      }
+    }
+    loadCourses();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const validateFile = (file) => {
     if (!file) {
@@ -125,79 +154,50 @@ export default function UploadSubmission() {
   const isFormValid =
     course !== "" && title.trim() !== "" && selectedFile !== null;
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  if (!selectedFile) {
-    setFileError("Please select a file.");
-    return;
-  }
-
-  if (!isFormValid || isProcessing) {
-    return;
-  }
-
-  setIsProcessing(true);
-  setFileError("");
-
-  try {
-    // Create form data
-    const formData = new FormData();
-
-    // Add the selected document
-    formData.append("file", selectedFile);
-
-    // Send document to FastAPI
-    const response = await fetch(
-      "http://127.0.0.1:8000/api/v1/analyze",
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    // Get backend response
-    const result = await response.json();
-
-    // Check for backend error
-    if (!response.ok) {
-      throw new Error(
-        result.detail || "Document analysis failed."
-      );
+    if (!selectedFile) {
+      setFileError("Please select a file.");
+      return;
     }
 
-    console.log("Analysis result:", result);
+    if (!isFormValid || isProcessing) {
+      return;
+    }
 
-    // Get course name
-    const courseLabel =
-      COURSE_OPTIONS.find((c) => c.value === course)?.label || course;
+    setIsProcessing(true);
+    setFileError("");
 
-    // Store submission information
-    setSubmittedInfo({
-      title: title.trim(),
-      course: courseLabel,
-      fileName: selectedFile.name,
+    try {
+      // Create form data for backend submission
+      const formData = new FormData();
+      formData.append("title", title.trim());
+      formData.append("course_id", course);
+      formData.append("file", selectedFile);
 
-      // AI analysis result
-      similarityScore: result.overall_similarity_score,
-      riskLevel: result.risk_level,
-      matches: result.matches,
-    });
+      // Call API service with JWT authentication
+      const result = await submitAssignment(formData);
 
-    setIsProcessing(false);
-    setIsSuccess(true);
+      console.log("Submission successful:", result);
 
-  } catch (error) {
-    console.error("Analysis error:", error);
+      // Direct redirection to the actual plagiarism report page
+      if (result && result.report_id) {
+        navigate(`/student/reports/${result.report_id}`);
+      } else {
+        navigate("/student/reports");
+      }
+    } catch (error) {
+      console.error("Submission error:", error);
 
-    setFileError(
-      error.message ||
-        "Unable to connect to the plagiarism analysis server."
-    );
+      setFileError(
+        error.message ||
+          "Unable to complete document analysis. Please check your file and try again."
+      );
 
-    setIsProcessing(false);
-  }
-};
+      setIsProcessing(false);
+    }
+  };
 
   const handleUploadAnother = () => {
     setCourse("");
@@ -270,12 +270,13 @@ export default function UploadSubmission() {
         </nav>
 
         <div className="px-3 py-4 mt-auto border-t border-white/10">
-          <Link
-            to="/"
-            className="block rounded-lg px-3.5 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition"
+          <button
+            type="button"
+            onClick={logout}
+            className="w-full text-left rounded-lg px-3.5 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition"
           >
             Logout
-          </Link>
+          </button>
         </div>
       </aside>
 
@@ -430,7 +431,7 @@ export default function UploadSubmission() {
                       className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     >
                       <option value="">Select a course</option>
-                      {COURSE_OPTIONS.map((opt) => (
+                      {coursesList.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
                         </option>
