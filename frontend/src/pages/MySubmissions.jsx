@@ -1,62 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-
-const submissions = [
-  {
-    id: 1,
-    title: "Artificial Intelligence Assignment 2",
-    course: "Artificial Intelligence",
-    courseCode: "CS402",
-    date: "Sep 10, 2026",
-    status: "Completed",
-    similarity: 12,
-  },
-  {
-    id: 2,
-    title: "Neural Network Architectures Report",
-    course: "Machine Learning",
-    courseCode: "CS410",
-    date: "Sep 8, 2026",
-    status: "Review Required",
-    similarity: 43,
-  },
-  {
-    id: 3,
-    title: "Normalization Techniques Essay",
-    course: "Database Management",
-    courseCode: "CS305",
-    date: "Sep 7, 2026",
-    status: "Processing",
-    similarity: null,
-  },
-  {
-    id: 4,
-    title: "Routing Protocols Case Study",
-    course: "Computer Networks",
-    courseCode: "CS330",
-    date: "Sep 3, 2026",
-    status: "Completed",
-    similarity: 8,
-  },
-  {
-    id: 5,
-    title: "Knowledge Representation Assignment",
-    course: "Artificial Intelligence",
-    courseCode: "CS402",
-    date: "Aug 29, 2026",
-    status: "Completed",
-    similarity: 18,
-  },
-  {
-    id: 6,
-    title: "Supervised Learning Models Summary",
-    course: "Machine Learning",
-    courseCode: "CS410",
-    date: "Aug 25, 2026",
-    status: "Review Required",
-    similarity: 27,
-  },
-];
+import { useAuth } from "../context/AuthContext";
+import { getStudentSubmissions } from "../service/api";
 
 const sidebarItems = [
   { label: "Dashboard", href: "/student/dashboard" },
@@ -80,12 +25,14 @@ const statusDot = {
 };
 
 function StatusBadge({ status }) {
+  const badgeClass = statusStyles[status] || "bg-slate-50 text-slate-700 border border-slate-200";
+  const dotClass = statusDot[status] || "bg-slate-400";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${badgeClass}`}
     >
       <span
-        className={`h-1.5 w-1.5 rounded-full ${statusDot[status]}`}
+        className={`h-1.5 w-1.5 rounded-full ${dotClass}`}
         aria-hidden="true"
       />
       {status}
@@ -111,29 +58,91 @@ function SummaryCard({ label, value, helper, icon }) {
 }
 
 export default function MySubmissions() {
+  const { user, logout } = useAuth();
+
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [courseFilter, setCourseFilter] = useState("All Courses");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
+  const loadSubmissions = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getStudentSubmissions();
+      if (data && Array.isArray(data.submissions)) {
+        setSubmissions(data.submissions);
+      } else {
+        setError("Invalid response format received from server.");
+      }
+    } catch (err) {
+      setError(err.message || "Failed to load your submissions.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSubmissions();
+  }, []);
+
+  // Compute live summary statistics
   const totalCount = submissions.length;
   const completedCount = submissions.filter((s) => s.status === "Completed").length;
   const processingCount = submissions.filter((s) => s.status === "Processing").length;
   const reviewCount = submissions.filter((s) => s.status === "Review Required").length;
 
-  const filteredSubmissions = submissions.filter((submission) => {
-    const matchesSearch =
-      submission.title.toLowerCase().includes(search.toLowerCase()) ||
-      submission.course.toLowerCase().includes(search.toLowerCase());
+  // Extract unique course names for dropdown
+  const courseOptions = useMemo(() => {
+    const unique = new Set();
+    submissions.forEach((s) => {
+      if (s.course) unique.add(s.course);
+    });
+    return Array.from(unique);
+  }, [submissions]);
 
-    const matchesStatus =
-      statusFilter === "All" || submission.status === statusFilter;
+  // Filter submissions
+  const filteredSubmissions = useMemo(() => {
+    return submissions.filter((submission) => {
+      const q = search.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        submission.title?.toLowerCase().includes(q) ||
+        submission.course?.toLowerCase().includes(q) ||
+        submission.course_code?.toLowerCase().includes(q) ||
+        submission.filename?.toLowerCase().includes(q);
 
-    const matchesCourse =
-      courseFilter === "All Courses" || submission.course === courseFilter;
+      const matchesStatus =
+        statusFilter === "All" || submission.status === statusFilter;
 
-    return matchesSearch && matchesStatus && matchesCourse;
-  });
+      const matchesCourse =
+        courseFilter === "All Courses" || submission.course === courseFilter;
+
+      return matchesSearch && matchesStatus && matchesCourse;
+    });
+  }, [submissions, search, statusFilter, courseFilter]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, courseFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSubmissions.length / itemsPerPage));
+  const paginatedSubmissions = filteredSubmissions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const resetFilters = () => {
+    setSearch("");
+    setStatusFilter("All");
+    setCourseFilter("All Courses");
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -202,12 +211,13 @@ export default function MySubmissions() {
               })}
             </nav>
             <div className="border-t border-slate-800 px-3 py-4">
-              <Link
-                to="/logout"
-                className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              <button
+                type="button"
+                onClick={logout}
+                className="w-full text-left rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
               >
                 Logout
-              </Link>
+              </button>
             </div>
           </div>
         </aside>
@@ -237,7 +247,7 @@ export default function MySubmissions() {
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">My Submissions</h1>
               <p className="mt-1 text-sm text-slate-500">
-                View and track all your submitted assignments.
+                View and track all your submitted assignments and analysis status.
               </p>
             </div>
             <Link
@@ -250,6 +260,20 @@ export default function MySubmissions() {
               Upload New Assignment
             </Link>
           </div>
+
+          {/* Error banner */}
+          {error && (
+            <div className="mb-6 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <p>{error}</p>
+              <button
+                type="button"
+                onClick={loadSubmissions}
+                className="ml-4 font-semibold underline hover:text-red-900"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
 
           {/* Summary cards */}
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -311,7 +335,7 @@ export default function MySubmissions() {
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search submissions..."
+                    placeholder="Search submissions by title or code..."
                     className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                   />
                 </div>
@@ -328,8 +352,8 @@ export default function MySubmissions() {
                   className="w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 >
                   <option value="All">All Statuses</option>
-                  <option value="Processing">Processing</option>
                   <option value="Completed">Completed</option>
+                  <option value="Processing">Processing</option>
                   <option value="Review Required">Review Required</option>
                 </select>
               </div>
@@ -345,18 +369,61 @@ export default function MySubmissions() {
                   className="w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 >
                   <option value="All Courses">All Courses</option>
-                  <option value="Artificial Intelligence">Artificial Intelligence</option>
-                  <option value="Machine Learning">Machine Learning</option>
-                  <option value="Database Management">Database Management</option>
-                  <option value="Computer Networks">Computer Networks</option>
+                  {courseOptions.map((course) => (
+                    <option key={course} value={course}>
+                      {course}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Submissions table */}
+          {/* Submissions table / content */}
           <div className="mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            {filteredSubmissions.length === 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                <svg
+                  className="h-8 w-8 animate-spin text-emerald-600"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                <p className="mt-4 text-sm font-medium text-slate-700">Loading submissions...</p>
+              </div>
+            ) : submissions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V18a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-slate-700">No submissions yet</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  You haven&apos;t submitted any assignments yet. Submit an academic document to get started.
+                </p>
+                <Link
+                  to="/student/upload"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition"
+                >
+                  Upload First Assignment
+                </Link>
+              </div>
+            ) : filteredSubmissions.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -365,8 +432,15 @@ export default function MySubmissions() {
                 </div>
                 <p className="text-sm font-medium text-slate-700">No submissions found</p>
                 <p className="mt-1 text-sm text-slate-400">
-                  Try changing your search or filter.
+                  Try adjusting your search query or reset your filters.
                 </p>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="mt-4 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Reset Filters
+                </button>
               </div>
             ) : (
               <>
@@ -384,35 +458,38 @@ export default function MySubmissions() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredSubmissions.map((submission) => (
+                      {paginatedSubmissions.map((submission) => (
                         <tr key={submission.id} className="hover:bg-slate-50">
                           <td className="px-5 py-4 font-medium text-slate-800">
-                            {submission.title}
+                            <div>{submission.title}</div>
+                            {submission.filename && (
+                              <div className="text-xs text-slate-400 mt-0.5">{submission.filename}</div>
+                            )}
                           </td>
                           <td className="px-5 py-4 text-slate-600">
-                            {submission.courseCode} - {submission.course}
+                            {submission.course_code ? `${submission.course_code} - ` : ""}{submission.course}
                           </td>
                           <td className="px-5 py-4 text-slate-600">{submission.date}</td>
                           <td className="px-5 py-4">
                             <StatusBadge status={submission.status} />
                           </td>
                           <td className="px-5 py-4 text-slate-600">
-                            {submission.similarity !== null
+                            {submission.similarity !== null && submission.similarity !== undefined
                               ? `${submission.similarity}% Similarity`
                               : "—"}
                           </td>
                           <td className="px-5 py-4">
-                            {submission.status === "Processing" ? (
-                              <span className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500">
-                                View Status
-                              </span>
-                            ) : (
+                            {submission.report_id ? (
                               <Link
-                                to={`/student/reports/${submission.id}`}
+                                to={`/student/reports/${submission.report_id}`}
                                 className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                               >
                                 View Report
                               </Link>
+                            ) : (
+                              <span className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-400">
+                                {submission.status === "Processing" ? "Processing..." : "Pending"}
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -423,37 +500,42 @@ export default function MySubmissions() {
 
                 {/* Mobile stacked cards */}
                 <div className="divide-y divide-slate-100 md:hidden">
-                  {filteredSubmissions.map((submission) => (
+                  {paginatedSubmissions.map((submission) => (
                     <div key={submission.id} className="px-4 py-4">
                       <div className="mb-2 flex items-start justify-between gap-3">
-                        <p className="text-sm font-medium text-slate-800">
-                          {submission.title}
-                        </p>
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">
+                            {submission.title}
+                          </p>
+                          {submission.filename && (
+                            <p className="text-xs text-slate-400 mt-0.5">{submission.filename}</p>
+                          )}
+                        </div>
                         <StatusBadge status={submission.status} />
                       </div>
                       <p className="text-xs text-slate-500">
-                        {submission.courseCode} - {submission.course}
+                        {submission.course_code ? `${submission.course_code} - ` : ""}{submission.course}
                       </p>
                       <div className="mt-3 flex items-center justify-between">
                         <div className="text-xs text-slate-500">
                           <p>{submission.date}</p>
                           <p className="mt-0.5">
-                            {submission.similarity !== null
+                            {submission.similarity !== null && submission.similarity !== undefined
                               ? `${submission.similarity}% Similarity`
                               : "Similarity pending"}
                           </p>
                         </div>
-                        {submission.status === "Processing" ? (
-                          <span className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500">
-                            View Status
-                          </span>
-                        ) : (
+                        {submission.report_id ? (
                           <Link
-                            to={`/student/reports/${submission.id}`}
+                            to={`/student/reports/${submission.report_id}`}
                             className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                           >
                             View Report
                           </Link>
+                        ) : (
+                          <span className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-400">
+                            {submission.status === "Processing" ? "Processing..." : "Pending"}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -464,30 +546,36 @@ export default function MySubmissions() {
           </div>
 
           {/* Pagination */}
-          {filteredSubmissions.length > 0 && (
+          {filteredSubmissions.length > itemsPerPage && (
             <div className="mb-6 flex items-center justify-center gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 Previous
               </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  type="button"
+                  onClick={() => setCurrentPage(pageNum)}
+                  aria-current={currentPage === pageNum ? "page" : undefined}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                    currentPage === pageNum
+                      ? "border border-emerald-500 bg-emerald-500 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
               <button
                 type="button"
-                aria-current="page"
-                className="rounded-lg border border-emerald-500 bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                1
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                2
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 Next
               </button>

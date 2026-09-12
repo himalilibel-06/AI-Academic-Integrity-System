@@ -130,3 +130,102 @@ def get_submission_with_details(connection, submission_id):
     )
 
     return cursor.fetchone()
+
+
+def get_student_dashboard_stats(connection, student_id):
+    """
+    Compute dashboard statistics for a specific student.
+    Returns: total_submissions, completed_submissions, under_review,
+             reports_available, average_similarity.
+    """
+    cursor = connection.cursor()
+
+    # Total submissions
+    cursor.execute(
+        "SELECT COUNT(*) FROM submissions WHERE student_id = ?",
+        (student_id,)
+    )
+    total_submissions = cursor.fetchone()[0]
+
+    # Completed submissions
+    cursor.execute(
+        "SELECT COUNT(*) FROM submissions WHERE student_id = ? AND status = 'completed'",
+        (student_id,)
+    )
+    completed_submissions = cursor.fetchone()[0]
+
+    # Under review submissions (risk requires review or flagged)
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM submissions s
+        LEFT JOIN plagiarism_reports r ON r.submission_id = s.id
+        WHERE s.student_id = ? AND (
+            r.risk_level IN ('review_required', 'high_risk')
+            OR r.review_status = 'review_required'
+            OR s.status = 'review_required'
+        )
+        """,
+        (student_id,)
+    )
+    under_review = cursor.fetchone()[0]
+
+    # Reports available count
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM plagiarism_reports r
+        JOIN submissions s ON r.submission_id = s.id
+        WHERE s.student_id = ?
+        """,
+        (student_id,)
+    )
+    reports_available = cursor.fetchone()[0]
+
+    # Average similarity percentage
+    cursor.execute(
+        """
+        SELECT COALESCE(ROUND(AVG(r.overall_similarity_score), 1), 0.0)
+        FROM plagiarism_reports r
+        JOIN submissions s ON r.submission_id = s.id
+        WHERE s.student_id = ?
+        """,
+        (student_id,)
+    )
+    avg_score = cursor.fetchone()[0]
+
+    return {
+        "total_submissions": total_submissions,
+        "completed": completed_submissions,
+        "under_review": under_review,
+        "reports_available": reports_available,
+        "average_similarity": float(avg_score) if avg_score is not None else 0.0,
+    }
+
+
+def get_student_submissions_with_reports(connection, student_id, limit=None):
+    """
+    Get all submissions by a student joined with course and report details.
+    """
+    cursor = connection.cursor()
+
+    query = """
+        SELECT s.id, s.student_id, s.course_id, s.title, s.filename, s.file_path,
+               s.file_type, s.status, s.submitted_at,
+               c.name AS course_name, c.code AS course_code,
+               r.id AS report_id, r.overall_similarity_score AS similarity_score,
+               r.risk_level, r.review_status
+        FROM submissions s
+        LEFT JOIN courses c ON s.course_id = c.id
+        LEFT JOIN plagiarism_reports r ON r.submission_id = s.id
+        WHERE s.student_id = ?
+        ORDER BY s.submitted_at DESC, s.id DESC
+    """
+
+    params = [student_id]
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+
+    cursor.execute(query, tuple(params))
+    return cursor.fetchall()

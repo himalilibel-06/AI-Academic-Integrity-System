@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { getStudentDashboard } from "../service/api";
 
 /* ---------------------------------------------------------
    Inline icons (no extra dependency)
@@ -86,65 +88,6 @@ const icons = {
   ),
 };
 
-/* ---------------------------------------------------------
-   Mock data — replace with API data once the backend is live
---------------------------------------------------------- */
-const student = {
-  name: "Hima Lilibel",
-  email: "student@example.com",
-  initials: "HL",
-};
-
-const summaryStats = [
-  { label: "Total Submissions", value: 12, note: "Since Aug 2026", icon: icons.submissions },
-  { label: "Completed", value: 9, note: "Reviewed & finalized", icon: icons.docCheck },
-  { label: "Under Review", value: 2, note: "Pending professor review", icon: icons.clock },
-  { label: "Reports Available", value: 9, note: "Ready to view", icon: icons.reports },
-];
-
-const recentSubmissions = [
-  {
-    id: 1,
-    title: "Artificial Intelligence Assignment",
-    course: "CS402 - Artificial Intelligence",
-    date: "Sep 10, 2026",
-    status: "Completed",
-    similarity: 12,
-  },
-  {
-    id: 2,
-    title: "Database Normalization Report",
-    course: "CS305 - Database Systems",
-    date: "Sep 8, 2026",
-    status: "Review Required",
-    similarity: 45,
-  },
-  {
-    id: 3,
-    title: "Operating Systems Case Study",
-    course: "CS310 - Operating Systems",
-    date: "Sep 5, 2026",
-    status: "Completed",
-    similarity: 8,
-  },
-  {
-    id: 4,
-    title: "Machine Learning Literature Review",
-    course: "CS420 - Machine Learning",
-    date: "Sep 3, 2026",
-    status: "Processing",
-    similarity: null,
-  },
-  {
-    id: 5,
-    title: "Software Engineering Proposal",
-    course: "CS330 - Software Engineering",
-    date: "Aug 29, 2026",
-    status: "Completed",
-    similarity: 28,
-  },
-];
-
 const navItems = [
   { label: "Dashboard", icon: icons.dashboard, to: "/student/dashboard" },
   { label: "Upload Submission", icon: icons.upload, to: "/student/upload" },
@@ -181,7 +124,7 @@ function StatusBadge({ status }) {
 }
 
 function SimilarityValue({ value }) {
-  if (value === null) {
+  if (value === null || value === undefined) {
     return <span className="text-sm text-slate-400">Pending</span>;
   }
   const color =
@@ -190,7 +133,64 @@ function SimilarityValue({ value }) {
 }
 
 export default function StudentDashboard() {
+  const { user, logout } = useAuth();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await getStudentDashboard();
+      if (response && response.success) {
+        setDashboardData(response);
+      } else {
+        setError("Failed to load dashboard metrics.");
+      }
+    } catch (err) {
+      setError(err.message || "Unable to connect to the academic server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const studentInfo = dashboardData?.student || {
+    name: user?.name || "Student",
+    email: user?.email || "",
+    initials: user?.name
+      ? user.name
+          .split(" ")
+          .filter(Boolean)
+          .map((p) => p[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase()
+      : "ST",
+  };
+
+  const stats = dashboardData?.stats || {
+    total_submissions: 0,
+    completed: 0,
+    under_review: 0,
+    reports_available: 0,
+    average_similarity: 0.0,
+  };
+
+  const summaryStats = [
+    { label: "Total Submissions", value: stats.total_submissions, note: "All-time submissions", icon: icons.submissions },
+    { label: "Completed", value: stats.completed, note: "Reviewed & finalized", icon: icons.docCheck },
+    { label: "Under Review", value: stats.under_review, note: "Pending instructor review", icon: icons.clock },
+    { label: "Reports Available", value: stats.reports_available, note: "Similarity analysis ready", icon: icons.reports },
+  ];
+
+  const recentSubmissions = dashboardData?.recent_submissions || [];
 
   return (
     <div className="min-h-screen bg-slate-50 lg:flex">
@@ -206,7 +206,7 @@ export default function StudentDashboard() {
         </button>
         <span className="text-sm font-semibold text-slate-900">AI Academic Integrity</span>
         <div className="h-8 w-8 rounded-full bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center">
-          {student.initials}
+          {studentInfo.initials}
         </div>
       </div>
 
@@ -263,7 +263,8 @@ export default function StudentDashboard() {
 
         <button
           type="button"
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white"
+          onClick={logout}
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
         >
           {icons.logout({ className: "h-5 w-5" })}
           Logout
@@ -291,167 +292,235 @@ export default function StudentDashboard() {
             </button>
             <div className="flex items-center gap-3 border-l border-slate-200 pl-5">
               <div className="h-9 w-9 rounded-full bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center">
-                {student.initials}
+                {studentInfo.initials}
               </div>
               <div className="text-sm">
-                <p className="font-medium text-slate-900 leading-tight">{student.name}</p>
-                <p className="text-slate-500 leading-tight">{student.email}</p>
+                <p className="font-medium text-slate-900 leading-tight">{studentInfo.name}</p>
+                <p className="text-slate-500 leading-tight">{studentInfo.email}</p>
               </div>
             </div>
           </div>
         </header>
 
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8 space-y-6">
-          {/* Welcome section */}
-          <section className="rounded-2xl border border-slate-200 bg-white px-6 py-7 sm:px-8 sm:py-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Welcome back, {student.name.split(" ")[0]}!
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 max-w-md">
-                Track your assignments and review your academic integrity reports.
-              </p>
-            </div>
-            <Link
-              to="/student/upload"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors whitespace-nowrap"
-            >
-              {icons.upload({ className: "h-4 w-4" })}
-              Upload Assignment
-            </Link>
-          </section>
-
-          {/* Statistics */}
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {summaryStats.map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-2xl border border-slate-200 bg-white px-5 py-5"
+          {/* Error Banner */}
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center justify-between">
+              <p>{error}</p>
+              <button
+                type="button"
+                onClick={loadDashboard}
+                className="font-semibold underline hover:text-red-800 ml-4"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-slate-500">{stat.label}</p>
-                    <p className="mt-1.5 text-2xl font-semibold text-slate-900">{stat.value}</p>
-                  </div>
-                  <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500">
-                    {stat.icon({ className: "h-5 w-5" })}
-                  </div>
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Loading Indicator */}
+          {loading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+              <svg
+                className="mx-auto h-8 w-8 animate-spin text-emerald-600"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              <p className="mt-4 text-sm font-medium text-slate-700">Loading student dashboard...</p>
+            </div>
+          ) : (
+            <>
+              {/* Welcome section */}
+              <section className="rounded-2xl border border-slate-200 bg-white px-6 py-7 sm:px-8 sm:py-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Welcome back, {studentInfo.name.split(" ")[0]}!
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500 max-w-md">
+                    Track your assignments and review your academic integrity reports.
+                  </p>
                 </div>
-                <p className="mt-3 text-xs text-slate-400">{stat.note}</p>
-              </div>
-            ))}
-          </section>
+                <Link
+                  to="/student/upload"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors whitespace-nowrap"
+                >
+                  {icons.upload({ className: "h-4 w-4" })}
+                  Upload Assignment
+                </Link>
+              </section>
 
-          {/* Recent submissions */}
-          <section className="rounded-2xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-              <h3 className="text-base font-semibold text-slate-900">Recent Submissions</h3>
-              <Link
-                to="/student/submissions"
-                className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
-              >
-                View all
-              </Link>
-            </div>
-
-            {/* Desktop table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="text-slate-500 border-b border-slate-200">
-                    <th className="px-6 py-3 font-medium">Assignment</th>
-                    <th className="px-4 py-3 font-medium">Course</th>
-                    <th className="px-4 py-3 font-medium">Submitted Date</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Similarity</th>
-                    <th className="px-6 py-3 font-medium text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentSubmissions.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-6 py-4 text-slate-900 font-medium">{item.title}</td>
-                      <td className="px-4 py-4 text-slate-600">{item.course}</td>
-                      <td className="px-4 py-4 text-slate-600">{item.date}</td>
-                      <td className="px-4 py-4">
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td className="px-4 py-4">
-                        <SimilarityValue value={item.similarity} />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <Link
-                          to="/student/reports"
-                          className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
-                        >
-                          View Report
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile card list */}
-            <div className="md:hidden divide-y divide-slate-100">
-              {recentSubmissions.map((item) => (
-                <div key={item.id} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-medium text-slate-900">{item.title}</p>
-                    <StatusBadge status={item.status} />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">{item.course}</p>
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="text-xs text-slate-500">
-                      <span>{item.date}</span>
-                      <span className="mx-2">•</span>
-                      <SimilarityValue value={item.similarity} />
+              {/* Statistics */}
+              <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {summaryStats.map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm text-slate-500">{stat.label}</p>
+                        <p className="mt-1.5 text-2xl font-semibold text-slate-900">{stat.value}</p>
+                      </div>
+                      <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500">
+                        {stat.icon({ className: "h-5 w-5" })}
+                      </div>
                     </div>
+                    <p className="mt-3 text-xs text-slate-400">{stat.note}</p>
+                  </div>
+                ))}
+              </section>
+
+              {/* Recent submissions */}
+              <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+                  <h3 className="text-base font-semibold text-slate-900">Recent Submissions</h3>
+                  <Link
+                    to="/student/submissions"
+                    className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
+                  >
+                    View all
+                  </Link>
+                </div>
+
+                {recentSubmissions.length === 0 ? (
+                  <div className="px-6 py-12 text-center">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                      {icons.submissions({ className: "h-6 w-6" })}
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900">No submissions yet</p>
+                    <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
+                      You haven&apos;t submitted any assignments yet. Submit an academic document to run plagiarism similarity analysis.
+                    </p>
                     <Link
-                      to="/student/reports"
-                      className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
+                      to="/student/upload"
+                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition"
                     >
-                      View Report
+                      {icons.upload({ className: "h-4 w-4" })}
+                      Upload First Assignment
                     </Link>
                   </div>
+                ) : (
+                  <>
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                            <th className="px-6 py-3 font-medium">Assignment</th>
+                            <th className="px-4 py-3 font-medium">Course</th>
+                            <th className="px-4 py-3 font-medium">Submitted Date</th>
+                            <th className="px-4 py-3 font-medium">Status</th>
+                            <th className="px-4 py-3 font-medium">Similarity</th>
+                            <th className="px-6 py-3 font-medium text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentSubmissions.map((item) => (
+                            <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                              <td className="px-6 py-4 text-slate-900 font-medium">{item.title}</td>
+                              <td className="px-4 py-4 text-slate-600">
+                                {item.course_code ? `${item.course_code} - ` : ""}{item.course}
+                              </td>
+                              <td className="px-4 py-4 text-slate-600">{item.date}</td>
+                              <td className="px-4 py-4">
+                                <StatusBadge status={item.status} />
+                              </td>
+                              <td className="px-4 py-4">
+                                <SimilarityValue value={item.similarity} />
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <Link
+                                  to={item.report_id ? `/student/reports/${item.report_id}` : "/student/reports"}
+                                  className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
+                                >
+                                  View Report
+                                </Link>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile card list */}
+                    <div className="md:hidden divide-y divide-slate-100">
+                      {recentSubmissions.map((item) => (
+                        <div key={item.id} className="px-5 py-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-medium text-slate-900">{item.title}</p>
+                            <StatusBadge status={item.status} />
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {item.course_code ? `${item.course_code} - ` : ""}{item.course}
+                          </p>
+                          <div className="mt-3 flex items-center justify-between">
+                            <div className="text-xs text-slate-500">
+                              <span>{item.date}</span>
+                              <span className="mx-2">•</span>
+                              <SimilarityValue value={item.similarity} />
+                            </div>
+                            <Link
+                              to={item.report_id ? `/student/reports/${item.report_id}` : "/student/reports"}
+                              className="text-sm font-medium text-emerald-500 hover:text-emerald-600"
+                            >
+                              View Report
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
+
+              {/* Similarity info note */}
+              <section className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-5 py-4 flex gap-3">
+                <div className="text-emerald-500 flex-shrink-0">
+                  {icons.info({ className: "h-5 w-5" })}
                 </div>
-              ))}
-            </div>
-          </section>
+                <p className="text-sm text-emerald-900 leading-relaxed">
+                  Similarity scores indicate matching content and are intended to support academic
+                  review. A similarity score alone does not prove plagiarism.
+                </p>
+              </section>
 
-          {/* Similarity info note */}
-          <section className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-5 py-4 flex gap-3">
-            <div className="text-emerald-500 flex-shrink-0">
-              {icons.info({ className: "h-5 w-5" })}
-            </div>
-            <p className="text-sm text-emerald-900 leading-relaxed">
-              Similarity scores indicate matching content and are intended to support academic
-              review. A similarity score alone does not prove plagiarism.
-            </p>
-          </section>
-
-          {/* Quick actions */}
-          <section>
-            <h3 className="text-base font-semibold text-slate-900 mb-3">Quick Actions</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {quickActions.map((action) => (
-                <Link
-                  key={action.label}
-                  to={action.to}
-                  className="rounded-2xl border border-slate-200 bg-white px-5 py-5 flex items-start gap-3 hover:border-emerald-400 hover:shadow-sm transition-all"
-                >
-                  <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500 flex-shrink-0">
-                    {action.icon({ className: "h-5 w-5" })}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{action.label}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{action.description}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
+              {/* Quick actions */}
+              <section>
+                <h3 className="text-base font-semibold text-slate-900 mb-3">Quick Actions</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {quickActions.map((action) => (
+                    <Link
+                      key={action.label}
+                      to={action.to}
+                      className="rounded-2xl border border-slate-200 bg-white px-5 py-5 flex items-start gap-3 hover:border-emerald-400 hover:shadow-sm transition-all shadow-sm"
+                    >
+                      <div className="rounded-lg bg-emerald-50 p-2 text-emerald-500 flex-shrink-0">
+                        {action.icon({ className: "h-5 w-5" })}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{action.label}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{action.description}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
         </main>
       </div>
     </div>

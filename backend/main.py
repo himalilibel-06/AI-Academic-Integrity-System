@@ -8,6 +8,7 @@ from routes.analysis import router as analysis_router
 from routes.submissions import router as submissions_router
 from routes.reports import router as reports_router
 from routes.courses import router as courses_router
+from routes.student import router as student_router
 
 
 app = FastAPI(
@@ -40,6 +41,7 @@ finally:
 
 # Include application routers
 app.include_router(auth_router)
+app.include_router(student_router)
 app.include_router(submissions_router)
 app.include_router(reports_router)
 app.include_router(courses_router)

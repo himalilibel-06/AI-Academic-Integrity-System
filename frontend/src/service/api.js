@@ -99,3 +99,21 @@ export async function getCourses() {
     method: "GET",
   });
 }
+
+/**
+ * Get student dashboard summary metrics, profile, and recent submissions.
+ */
+export async function getStudentDashboard() {
+  return apiRequest("/api/student/dashboard", {
+    method: "GET",
+  });
+}
+
+/**
+ * Get all past submissions for the logged-in student.
+ */
+export async function getStudentSubmissions() {
+  return apiRequest("/api/student/submissions", {
+    method: "GET",
+  });
+}
