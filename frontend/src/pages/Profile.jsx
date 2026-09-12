@@ -1,40 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-
-const initialProfile = {
-  fullName: "Hima Lilibel",
-  email: "student@example.com",
-  phone: "+91 98765 43210",
-  department: "Computer Science and Engineering",
-  institution: "Karunya Institute of Technology and Sciences",
-  yearOfStudy: "2nd Year",
-};
-
-const accountInfo = {
-  role: "Student",
-  status: "Active",
-  memberSince: "September 2026",
-  userId: "USR-2026-001",
-};
-
-const academicInfo = {
-  program: "B.Tech Computer Science and Engineering",
-  year: "2nd Year",
-  institution: "Karunya Institute of Technology and Sciences",
-};
-
-const yearOptions = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
-
-const sidebarItems = [
-  { label: "Dashboard", href: "/student/dashboard" },
-  { label: "Upload Submission", href: "/student/upload" },
-  { label: "My Submissions", href: "/student/submissions" },
-  { label: "Reports", href: "/student/reports" },
-  { label: "Profile", href: "/student/profile" },
-  { label: "Settings", href: "/student/settings" },
-];
+import { useAuth } from "../context/AuthContext";
+import { getCurrentUser, updateUserProfile, changePassword } from "../service/api";
 
 function getInitials(name) {
+  if (!name) return "U";
   return name
     .split(" ")
     .filter(Boolean)
@@ -53,13 +23,36 @@ function FieldLabel({ htmlFor, children }) {
 }
 
 export default function Profile() {
+  const { user: authUser, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [profile, setProfile] = useState(initialProfile);
-  const [draftProfile, setDraftProfile] = useState(initialProfile);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
+
+  const [profile, setProfile] = useState({
+    id: "",
+    fullName: "",
+    email: "",
+    phone: "",
+    department: "",
+    institution: "",
+    role: "student",
+    memberSince: "",
+  });
+
+  const [draftProfile, setDraftProfile] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    department: "",
+    institution: "",
+  });
+
   const [isEditing, setIsEditing] = useState(false);
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [passwordFields, setPasswordFields] = useState({
@@ -69,19 +62,122 @@ export default function Profile() {
   });
   const [passwordErrors, setPasswordErrors] = useState({});
   const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  const profileCompletion = 85;
+  // Role-aware navigation
+  const isProfessor = (profile.role || authUser?.role) === "professor";
+
+  const sidebarItems = isProfessor
+    ? [
+        { label: "Dashboard", href: "/professor/dashboard" },
+        { label: "Submissions", href: "/professor/submissions" },
+        { label: "Reports", href: "/professor/reports" },
+        { label: "Courses", href: "/professor/courses" },
+        { label: "Profile", href: "/professor/profile" },
+        { label: "Settings", href: "/professor/settings" },
+      ]
+    : [
+        { label: "Dashboard", href: "/student/dashboard" },
+        { label: "Upload Submission", href: "/student/upload" },
+        { label: "My Submissions", href: "/student/submissions" },
+        { label: "Reports", href: "/student/reports" },
+        { label: "Profile", href: "/student/profile" },
+        { label: "Settings", href: "/student/settings" },
+      ];
+
+  const dashboardHref = isProfessor ? "/professor/dashboard" : "/student/dashboard";
+
+  // Load profile data on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProfileData() {
+      setLoading(true);
+      setFetchError("");
+      try {
+        const response = await getCurrentUser();
+        if (isMounted && response.success && response.user) {
+          const u = response.user;
+          const memberDate = u.created_at
+            ? new Date(u.created_at).toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
+              })
+            : "Recent";
+
+          const profileData = {
+            id: u.id,
+            fullName: u.name || "",
+            email: u.email || "",
+            phone: u.phone || "",
+            department: u.department || "",
+            institution: u.institution || "",
+            role: u.role || "student",
+            memberSince: memberDate,
+          };
+
+          setProfile(profileData);
+          setDraftProfile({
+            fullName: profileData.fullName,
+            email: profileData.email,
+            phone: profileData.phone,
+            department: profileData.department,
+            institution: profileData.institution,
+          });
+        }
+      } catch (err) {
+        if (isMounted) {
+          setFetchError(err.message || "Failed to load profile details.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProfileData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Compute profile completion percentage dynamically
+  const profileCompletion = Math.round(
+    [
+      profile.fullName,
+      profile.email,
+      profile.phone,
+      profile.department,
+      profile.institution,
+    ].filter((val) => val && val.trim().length > 0).length * 20
+  );
 
   function handleStartEdit() {
-    setDraftProfile(profile);
+    setDraftProfile({
+      fullName: profile.fullName,
+      email: profile.email,
+      phone: profile.phone,
+      department: profile.department,
+      institution: profile.institution,
+    });
     setErrors({});
     setSuccessMessage("");
+    setSaveError("");
     setIsEditing(true);
   }
 
   function handleCancelEdit() {
-    setDraftProfile(profile);
+    setDraftProfile({
+      fullName: profile.fullName,
+      email: profile.email,
+      phone: profile.phone,
+      department: profile.department,
+      institution: profile.institution,
+    });
     setErrors({});
+    setSaveError("");
     setIsEditing(false);
   }
 
@@ -92,28 +188,49 @@ export default function Profile() {
   function validateProfile(data) {
     const newErrors = {};
     if (!data.fullName.trim()) newErrors.fullName = "Full name is required.";
-    if (!data.email.trim()) {
-      newErrors.email = "Email address is required.";
-    } else if (!/^\S+@\S+\.\S+$/.test(data.email)) {
-      newErrors.email = "Enter a valid email address.";
-    }
-    if (!data.phone.trim()) newErrors.phone = "Phone number is required.";
-    if (!data.department.trim()) newErrors.department = "Department is required.";
-    if (!data.institution.trim()) newErrors.institution = "Institution is required.";
-    if (!data.yearOfStudy.trim()) newErrors.yearOfStudy = "Year of study is required.";
     return newErrors;
   }
 
-  function handleSaveChanges() {
+  async function handleSaveChanges() {
     const validationErrors = validateProfile(draftProfile);
     setErrors(validationErrors);
     if (Object.keys(validationErrors).length > 0) {
       setSuccessMessage("");
       return;
     }
-    setProfile(draftProfile);
-    setIsEditing(false);
-    setSuccessMessage("Profile updated successfully (demo mode).");
+
+    setIsSaving(true);
+    setSaveError("");
+    setSuccessMessage("");
+
+    try {
+      const response = await updateUserProfile({
+        name: draftProfile.fullName.trim(),
+        department: draftProfile.department.trim(),
+        institution: draftProfile.institution.trim(),
+        phone: draftProfile.phone.trim(),
+      });
+
+      if (response.success && response.user) {
+        const u = response.user;
+        setProfile((prev) => ({
+          ...prev,
+          fullName: u.name,
+          department: u.department,
+          institution: u.institution,
+          phone: u.phone,
+        }));
+        setIsEditing(false);
+        setSuccessMessage("Profile updated successfully.");
+        setTimeout(() => setSuccessMessage(""), 4000);
+      } else {
+        setSaveError(response.message || "Failed to update profile.");
+      }
+    } catch (err) {
+      setSaveError(err.message || "An error occurred while updating profile.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function openPasswordModal() {
@@ -133,13 +250,15 @@ export default function Profile() {
 
   function validatePassword(data) {
     const newErrors = {};
-    if (!data.currentPassword.trim()) newErrors.currentPassword = "Current password is required.";
-    if (!data.newPassword.trim()) {
+    if (!data.currentPassword) newErrors.currentPassword = "Current password is required.";
+    if (!data.newPassword) {
       newErrors.newPassword = "New password is required.";
-    } else if (data.newPassword.length < 8) {
-      newErrors.newPassword = "New password must be at least 8 characters.";
+    } else if (data.newPassword.length < 6) {
+      newErrors.newPassword = "New password must be at least 6 characters.";
+    } else if (data.newPassword === data.currentPassword) {
+      newErrors.newPassword = "New password cannot be the same as the current password.";
     }
-    if (!data.confirmPassword.trim()) {
+    if (!data.confirmPassword) {
       newErrors.confirmPassword = "Please confirm your new password.";
     } else if (data.newPassword && data.confirmPassword !== data.newPassword) {
       newErrors.confirmPassword = "Passwords do not match.";
@@ -147,14 +266,36 @@ export default function Profile() {
     return newErrors;
   }
 
-  function handleUpdatePassword() {
+  async function handleUpdatePassword() {
     const validationErrors = validatePassword(passwordFields);
     setPasswordErrors(validationErrors);
     if (Object.keys(validationErrors).length > 0) {
       return;
     }
-    setPasswordSuccess("Password updated successfully (demo mode).");
-    setPasswordFields({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+    setIsChangingPassword(true);
+    setPasswordSuccess("");
+
+    try {
+      const response = await changePassword({
+        current_password: passwordFields.currentPassword,
+        new_password: passwordFields.newPassword,
+      });
+
+      if (response.success) {
+        setPasswordSuccess("Password changed successfully.");
+        setPasswordFields({ currentPassword: "", newPassword: "", confirmPassword: "" });
+        setTimeout(() => {
+          setPasswordModalOpen(false);
+        }, 1800);
+      } else {
+        setPasswordErrors({ general: response.message || "Failed to change password." });
+      }
+    } catch (err) {
+      setPasswordErrors({ general: err.message || "Failed to change password." });
+    } finally {
+      setIsChangingPassword(false);
+    }
   }
 
   return (
@@ -212,12 +353,13 @@ export default function Profile() {
               })}
             </nav>
             <div className="border-t border-slate-800 px-3 py-4">
-              <Link
-                to="/logout"
-                className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              <button
+                type="button"
+                onClick={logout}
+                className="w-full text-left rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 Logout
-              </Link>
+              </button>
             </div>
           </div>
         </aside>
@@ -235,7 +377,7 @@ export default function Profile() {
         <main className="min-h-screen w-full flex-1 px-4 pb-12 pt-20 sm:px-6 lg:px-10 lg:pt-10">
           {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="mb-3 text-sm text-slate-500">
-            <Link to="/student/dashboard" className="hover:text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded">
+            <Link to={dashboardHref} className="hover:text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded">
               Dashboard
             </Link>
             <span className="mx-2" aria-hidden="true">/</span>
@@ -246,322 +388,294 @@ export default function Profile() {
           <div className="mb-6">
             <h1 className="text-2xl font-semibold text-slate-900">My Profile</h1>
             <p className="mt-1 text-sm text-slate-500">
-              View and manage your personal and academic information.
+              View and manage your personal and academic account details.
             </p>
           </div>
 
-          {successMessage && (
-            <div
-              role="status"
-              className="mb-6 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75l2.25 2.25 6-6M12 21a9 9 0 100-18 9 9 0 000 18z" />
-              </svg>
-              {successMessage}
+          {loading ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-r-transparent" />
+              <p className="mt-3 text-sm text-slate-600">Loading profile information...</p>
             </div>
-          )}
-
-          {/* Profile header card */}
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
+          ) : fetchError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center shadow-sm">
+              <p className="text-sm font-medium text-red-800">{fetchError}</p>
+            </div>
+          ) : (
+            <>
+              {successMessage && (
                 <div
-                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg font-semibold text-white"
-                  aria-hidden="true"
+                  role="status"
+                  className="mb-6 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
                 >
-                  {getInitials(profile.fullName)}
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">{profile.fullName}</h2>
-                  <p className="text-sm text-slate-500">{profile.email}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                      {accountInfo.role}
-                    </span>
-                    <span className="text-xs text-slate-400">{profile.department}</span>
-                  </div>
-                </div>
-              </div>
-              {!isEditing && (
-                <button
-                  type="button"
-                  onClick={handleStartEdit}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75l2.25 2.25 6-6M12 21a9 9 0 100-18 9 9 0 000 18z" />
                   </svg>
-                  Edit Profile
-                </button>
+                  {successMessage}
+                </div>
               )}
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Left / main column */}
-            <div className="space-y-6 lg:col-span-2">
-              {/* Personal information */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-slate-900">Personal Information</h3>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <FieldLabel htmlFor="fullName">Full Name</FieldLabel>
-                    {isEditing ? (
-                      <>
-                        <input
-                          id="fullName"
-                          type="text"
-                          value={draftProfile.fullName}
-                          onChange={(e) => handleDraftChange("fullName", e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                        />
-                        {errors.fullName && (
-                          <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-sm text-slate-700">{profile.fullName}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <FieldLabel htmlFor="email">Email Address</FieldLabel>
-                    {isEditing ? (
-                      <>
-                        <input
-                          id="email"
-                          type="email"
-                          value={draftProfile.email}
-                          onChange={(e) => handleDraftChange("email", e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                        />
-                        {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
-                      </>
-                    ) : (
-                      <p className="text-sm text-slate-700">{profile.email}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <FieldLabel htmlFor="phone">Phone Number</FieldLabel>
-                    {isEditing ? (
-                      <>
-                        <input
-                          id="phone"
-                          type="tel"
-                          value={draftProfile.phone}
-                          onChange={(e) => handleDraftChange("phone", e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                        />
-                        {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
-                      </>
-                    ) : (
-                      <p className="text-sm text-slate-700">{profile.phone}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <FieldLabel htmlFor="department">Department</FieldLabel>
-                    {isEditing ? (
-                      <>
-                        <input
-                          id="department"
-                          type="text"
-                          value={draftProfile.department}
-                          onChange={(e) => handleDraftChange("department", e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                        />
-                        {errors.department && (
-                          <p className="mt-1 text-xs text-red-600">{errors.department}</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-sm text-slate-700">{profile.department}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <FieldLabel htmlFor="institution">Institution</FieldLabel>
-                    {isEditing ? (
-                      <>
-                        <input
-                          id="institution"
-                          type="text"
-                          value={draftProfile.institution}
-                          onChange={(e) => handleDraftChange("institution", e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                        />
-                        {errors.institution && (
-                          <p className="mt-1 text-xs text-red-600">{errors.institution}</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-sm text-slate-700">{profile.institution}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <FieldLabel htmlFor="yearOfStudy">Year of Study</FieldLabel>
-                    {isEditing ? (
-                      <>
-                        <select
-                          id="yearOfStudy"
-                          value={draftProfile.yearOfStudy}
-                          onChange={(e) => handleDraftChange("yearOfStudy", e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                        >
-                          {yearOptions.map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </select>
-                        {errors.yearOfStudy && (
-                          <p className="mt-1 text-xs text-red-600">{errors.yearOfStudy}</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-sm text-slate-700">{profile.yearOfStudy}</p>
-                    )}
-                  </div>
-                </div>
-
-                {isEditing && (
-                  <div className="mt-6 flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleSaveChanges}
-                      className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
-                    >
-                      Save Changes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancelEdit}
-                      className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Academic information */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-slate-900">Academic Information</h3>
-                <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-sm font-medium text-slate-500">Program</dt>
-                    <dd className="mt-1 text-sm text-slate-700">{academicInfo.program}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-slate-500">Year</dt>
-                    <dd className="mt-1 text-sm text-slate-700">{academicInfo.year}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-slate-500">Institution</dt>
-                    <dd className="mt-1 text-sm text-slate-700">{academicInfo.institution}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              {/* Security */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-slate-900">Security</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Keep your account secure by updating your password regularly.
-                </p>
-                {passwordSuccess && (
-                  <div
-                    role="status"
-                    className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75l2.25 2.25 6-6M12 21a9 9 0 100-18 9 9 0 000 18z" />
-                    </svg>
-                    {passwordSuccess}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={openPasswordModal}
-                  className="mt-4 inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  Change Password
-                </button>
-              </div>
-
-              {/* Account actions */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-slate-900">Account Actions</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Sign out of your account on this device.
-                </p>
-                <button
-                  type="button"
-                  className="mt-4 inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-
-            {/* Right column */}
-            <div className="space-y-6">
-              {/* Account information */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-slate-900">Account Information</h3>
-                <dl className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <dt className="text-sm text-slate-500">Role</dt>
-                    <dd className="text-sm font-medium text-slate-700">{accountInfo.role}</dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="text-sm text-slate-500">Account Status</dt>
-                    <dd>
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-                        {accountInfo.status}
-                      </span>
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="text-sm text-slate-500">Member Since</dt>
-                    <dd className="text-sm font-medium text-slate-700">{accountInfo.memberSince}</dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="text-sm text-slate-500">User ID</dt>
-                    <dd className="text-sm font-medium text-slate-700">{accountInfo.userId}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              {/* Profile completion */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-slate-900">Profile Completion</h3>
-                  <span className="text-sm font-semibold text-emerald-600">{profileCompletion}%</span>
-                </div>
+              {saveError && (
                 <div
-                  role="progressbar"
-                  aria-valuenow={profileCompletion}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label="Profile completion"
-                  className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100"
+                  role="alert"
+                  className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
                 >
-                  <div
-                    className="h-full rounded-full bg-emerald-500"
-                    style={{ width: `${profileCompletion}%` }}
-                  />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  {saveError}
                 </div>
-                <p className="mt-3 text-sm text-slate-500">
-                  Complete your profile information to keep your academic account up to date.
-                </p>
+              )}
+
+              {/* Profile header card */}
+              <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg font-semibold text-white uppercase shadow-sm"
+                      aria-hidden="true"
+                    >
+                      {getInitials(profile.fullName)}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">{profile.fullName || "User"}</h2>
+                      <p className="text-sm text-slate-500">{profile.email}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 capitalize">
+                          {isProfessor ? "Professor" : "Student"}
+                        </span>
+                        {profile.department && (
+                          <span className="text-xs text-slate-500">{profile.department}</span>
+                        )}
+                        {profile.institution && (
+                          <span className="text-xs text-slate-400">• {profile.institution}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {!isEditing && (
+                    <button
+                      type="button"
+                      onClick={handleStartEdit}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                      </svg>
+                      Edit Profile
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                {/* Left / main column */}
+                <div className="space-y-6 lg:col-span-2">
+                  {/* Personal & Academic information */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-slate-900">
+                      {isProfessor ? "Faculty Information" : "Personal & Academic Information"}
+                    </h3>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <FieldLabel htmlFor="fullName">Full Name</FieldLabel>
+                        {isEditing ? (
+                          <>
+                            <input
+                              id="fullName"
+                              type="text"
+                              value={draftProfile.fullName}
+                              onChange={(e) => handleDraftChange("fullName", e.target.value)}
+                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                              placeholder="Your full name"
+                            />
+                            {errors.fullName && (
+                              <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm text-slate-700">{profile.fullName || "—"}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <FieldLabel htmlFor="email">Email Address</FieldLabel>
+                        <p className="text-sm text-slate-700">{profile.email || "—"}</p>
+                        <span className="text-xs text-slate-400">Account login address</span>
+                      </div>
+
+                      <div>
+                        <FieldLabel htmlFor="phone">Phone Number</FieldLabel>
+                        {isEditing ? (
+                          <input
+                            id="phone"
+                            type="tel"
+                            value={draftProfile.phone}
+                            onChange={(e) => handleDraftChange("phone", e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                            placeholder="+1 555-0100"
+                          />
+                        ) : (
+                          <p className="text-sm text-slate-700">{profile.phone || "Not specified"}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <FieldLabel htmlFor="department">Department</FieldLabel>
+                        {isEditing ? (
+                          <input
+                            id="department"
+                            type="text"
+                            value={draftProfile.department}
+                            onChange={(e) => handleDraftChange("department", e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                            placeholder="e.g. Computer Science"
+                          />
+                        ) : (
+                          <p className="text-sm text-slate-700">{profile.department || "Not specified"}</p>
+                        )}
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <FieldLabel htmlFor="institution">Institution / University</FieldLabel>
+                        {isEditing ? (
+                          <input
+                            id="institution"
+                            type="text"
+                            value={draftProfile.institution}
+                            onChange={(e) => handleDraftChange("institution", e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                            placeholder="e.g. University School of Engineering"
+                          />
+                        ) : (
+                          <p className="text-sm text-slate-700">{profile.institution || "Not specified"}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {isEditing && (
+                      <div className="mt-6 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSaveChanges}
+                          disabled={isSaving}
+                          className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
+                        >
+                          {isSaving ? "Saving..." : "Save Changes"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEdit}
+                          disabled={isSaving}
+                          className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Security */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-slate-900">Security</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Keep your account secure by updating your password regularly.
+                    </p>
+                    {passwordSuccess && (
+                      <div
+                        role="status"
+                        className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75l2.25 2.25 6-6M12 21a9 9 0 100-18 9 9 0 000 18z" />
+                        </svg>
+                        {passwordSuccess}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={openPasswordModal}
+                      className="mt-4 inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      Change Password
+                    </button>
+                  </div>
+
+                  {/* Account actions */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-slate-900">Account Actions</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Sign out of your academic session on this device.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={logout}
+                      className="mt-4 inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right column */}
+                <div className="space-y-6">
+                  {/* Account information */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-slate-900">Account Information</h3>
+                    <dl className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <dt className="text-sm text-slate-500">Role</dt>
+                        <dd className="text-sm font-medium text-slate-700 capitalize">
+                          {isProfessor ? "Professor" : "Student"}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <dt className="text-sm text-slate-500">Account Status</dt>
+                        <dd>
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                            Active
+                          </span>
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <dt className="text-sm text-slate-500">Member Since</dt>
+                        <dd className="text-sm font-medium text-slate-700">{profile.memberSince || "Recent"}</dd>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <dt className="text-sm text-slate-500">User ID</dt>
+                        <dd className="text-sm font-medium text-slate-700">USR-{String(profile.id).padStart(4, "0")}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  {/* Profile completion */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-slate-900">Profile Completion</h3>
+                      <span className="text-sm font-semibold text-emerald-600">{profileCompletion}%</span>
+                    </div>
+                    <div
+                      role="progressbar"
+                      aria-valuenow={profileCompletion}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label="Profile completion"
+                      className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100"
+                    >
+                      <div
+                        className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                        style={{ width: `${profileCompletion}%` }}
+                      />
+                    </div>
+                    <p className="mt-3 text-sm text-slate-500">
+                      Complete your profile details to keep your academic institution records current.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </main>
       </div>
 
@@ -584,8 +698,20 @@ export default function Profile() {
               Change Password
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              Choose a new password for your account.
+              Choose a new secure password for your account.
             </p>
+
+            {passwordErrors.general && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700">
+                {passwordErrors.general}
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-700">
+                {passwordSuccess}
+              </div>
+            )}
 
             <div className="mt-4 space-y-4">
               <div>
@@ -596,6 +722,7 @@ export default function Profile() {
                   value={passwordFields.currentPassword}
                   onChange={(e) => handlePasswordFieldChange("currentPassword", e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  placeholder="••••••••"
                 />
                 {passwordErrors.currentPassword && (
                   <p className="mt-1 text-xs text-red-600">{passwordErrors.currentPassword}</p>
@@ -610,6 +737,7 @@ export default function Profile() {
                   value={passwordFields.newPassword}
                   onChange={(e) => handlePasswordFieldChange("newPassword", e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  placeholder="Minimum 6 characters"
                 />
                 {passwordErrors.newPassword && (
                   <p className="mt-1 text-xs text-red-600">{passwordErrors.newPassword}</p>
@@ -624,6 +752,7 @@ export default function Profile() {
                   value={passwordFields.confirmPassword}
                   onChange={(e) => handlePasswordFieldChange("confirmPassword", e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  placeholder="Repeat new password"
                 />
                 {passwordErrors.confirmPassword && (
                   <p className="mt-1 text-xs text-red-600">{passwordErrors.confirmPassword}</p>
@@ -635,6 +764,7 @@ export default function Profile() {
               <button
                 type="button"
                 onClick={closePasswordModal}
+                disabled={isChangingPassword}
                 className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 Cancel
@@ -642,9 +772,10 @@ export default function Profile() {
               <button
                 type="button"
                 onClick={handleUpdatePassword}
-                className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                disabled={isChangingPassword}
+                className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
               >
-                Update Password
+                {isChangingPassword ? "Updating..." : "Update Password"}
               </button>
             </div>
           </div>

@@ -166,3 +166,23 @@ export async function updateReportReview(reportId, { review_status, professor_fe
   });
 }
 
+/**
+ * Update authenticated user's profile details.
+ */
+export async function updateUserProfile({ name, department, institution, phone }) {
+  return apiRequest("/api/auth/profile", {
+    method: "PUT",
+    body: JSON.stringify({ name, department, institution, phone }),
+  });
+}
+
+/**
+ * Change authenticated user's password.
+ */
+export async function changePassword({ current_password, new_password }) {
+  return apiRequest("/api/auth/change-password", {
+    method: "PUT",
+    body: JSON.stringify({ current_password, new_password }),
+  });
+}
+

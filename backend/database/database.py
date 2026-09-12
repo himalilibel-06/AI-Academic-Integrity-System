@@ -43,6 +43,21 @@ def initialize_database():
         )
     """)
 
+    # Safe non-destructive migration for extended profile and preferences columns
+    cursor.execute("PRAGMA table_info(users)")
+    existing_user_columns = {row["name"] for row in cursor.fetchall()}
+
+    columns_to_add = [
+        ("department", "TEXT DEFAULT ''"),
+        ("institution", "TEXT DEFAULT ''"),
+        ("phone", "TEXT DEFAULT ''"),
+        ("preferences", "TEXT DEFAULT '{}'"),
+    ]
+
+    for col_name, col_def in columns_to_add:
+        if col_name not in existing_user_columns:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+
     # 2. Courses table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS courses (
