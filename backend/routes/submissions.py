@@ -3,10 +3,16 @@ import re
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, status
+from fastapi.responses import FileResponse
 
 from database.database import get_connection
 from models.course import get_course_by_id_or_code
-from models.submission import create_submission, update_submission_status
+from models.submission import (
+    create_submission,
+    get_submission_by_id,
+    get_historical_submissions_for_corpus,
+    update_submission_status,
+)
 from models.report import create_plagiarism_report
 from utils.auth import get_current_user_payload
 from utils.document_extractor import extract_text
@@ -157,8 +163,13 @@ async def submit_document(
             status="pending"
         )
 
-        # 10. Run plagiarism similarity analysis
-        analysis_result = calculate_similarity(processed_text)
+        # 10. Run plagiarism similarity analysis (comparing against reference corpus and prior peer submissions)
+        historical_docs = get_historical_submissions_for_corpus(
+            connection,
+            exclude_submission_id=submission_id,
+            course_id=resolved_course_id
+        )
+        analysis_result = calculate_similarity(processed_text, historical_documents=historical_docs)
         overall_similarity = analysis_result["overall_similarity_score"]
         risk_level = analysis_result["risk_level"]
         matches = analysis_result["matches"]
@@ -189,3 +200,104 @@ async def submit_document(
 
     finally:
         connection.close()
+
+
+@router.get("/{submission_id}/download")
+def download_submission_file(
+    submission_id: int,
+    payload: dict = Depends(get_current_user_payload)
+):
+    """
+    Download the original uploaded document for a submission.
+    Enforces authorization:
+    - Students may only download their own submissions.
+    - Professors may only download submissions for courses they teach.
+    """
+    user_id = payload.get("sub")
+    user_role = payload.get("role")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token: missing user ID."
+        )
+
+    try:
+        user_id_int = int(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format in token."
+        )
+
+    connection = get_connection()
+    try:
+        submission = get_submission_by_id(connection, submission_id)
+        if not submission:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Submission #{submission_id} not found."
+            )
+
+        # Ownership and authorization checks
+        if user_role == "student":
+            if submission["student_id"] != user_id_int:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to download this submission."
+                )
+        elif user_role == "professor":
+            # Check if professor teaches this course
+            cursor = connection.cursor()
+            cursor.execute("SELECT professor_id FROM courses WHERE id = ?", (submission["course_id"],))
+            course_row = cursor.fetchone()
+            if not course_row or course_row["professor_id"] != user_id_int:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to download submissions for courses you do not teach."
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorized to download this file."
+            )
+
+        file_rel = submission["file_path"]
+        if not file_rel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No file associated with this submission."
+            )
+
+        # Prevent directory traversal: isolate filename and resolve strictly within UPLOADS_DIR
+        safe_name = Path(file_rel).name
+        full_path = (UPLOADS_DIR / safe_name).resolve()
+
+        uploads_resolved = UPLOADS_DIR.resolve()
+        try:
+            full_path.relative_to(uploads_resolved)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid file path."
+            )
+
+        if not full_path.exists() or not full_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Submission file not found on server."
+            )
+
+        # Determine download filename and media type
+        download_filename = submission["filename"] or safe_name
+        media_type = submission["file_type"] or "application/octet-stream"
+
+        return FileResponse(
+            path=str(full_path),
+            filename=download_filename,
+            media_type=media_type
+        )
+
+    finally:
+        connection.close()
+

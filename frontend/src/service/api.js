@@ -205,3 +205,105 @@ export async function saveUserPreferences(preferences) {
   });
 }
 
+/**
+ * Download original uploaded submission file by submission ID.
+ */
+export async function downloadSubmissionFile(submissionId, preferredFilename = null) {
+  const token = localStorage.getItem("auth_token");
+  const headers = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/submissions/${submissionId}/download`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to download submission file.";
+    try {
+      const errJson = await response.json();
+      errorMsg = errJson.detail || errJson.message || errorMsg;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMsg);
+  }
+
+  let filename = preferredFilename;
+  const disposition = response.headers.get("Content-Disposition");
+  if (disposition && disposition.includes("filename=")) {
+    const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+    if (match && match[1]) {
+      filename = match[1];
+    }
+  }
+  if (!filename) {
+    filename = `submission_${submissionId}.txt`;
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+  return true;
+}
+
+/**
+ * Export official academic integrity report in HTML or JSON format.
+ */
+export async function exportPlagiarismReport(reportId, format = "html") {
+  const token = localStorage.getItem("auth_token");
+  const headers = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}/export?format=${format}`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to export report.";
+    try {
+      const errJson = await response.json();
+      errorMsg = errJson.detail || errJson.message || errorMsg;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMsg);
+  }
+
+  if (format === "json") {
+    return await response.json();
+  }
+
+  let filename = `Academic_Integrity_Report_${reportId}.html`;
+  const disposition = response.headers.get("Content-Disposition");
+  if (disposition && disposition.includes("filename=")) {
+    const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+    if (match && match[1]) {
+      filename = match[1];
+    }
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+  return true;
+}
+
+

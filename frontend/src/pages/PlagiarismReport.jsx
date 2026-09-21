@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getPlagiarismReport, getLatestPlagiarismReport } from "../service/api";
+import {
+  getPlagiarismReport,
+  getLatestPlagiarismReport,
+  downloadSubmissionFile,
+  exportPlagiarismReport,
+} from "../service/api";
 
 const NAV_ITEMS = [
   { label: "Dashboard", to: "/student/dashboard" },
@@ -164,7 +169,10 @@ export default function PlagiarismReport() {
   const [reportData, setReportData] = useState(null);
   const [selectedSourceId, setSelectedSourceId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [downloadRequested, setDownloadRequested] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isDownloadingOriginal, setIsDownloadingOriginal] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState("");
+  const [downloadError, setDownloadError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -184,12 +192,13 @@ export default function PlagiarismReport() {
           const r = response.report;
           const s = r.submission || {};
 
-          // Format sources from matches
+          // Format sources from matches with sentence-level segments
           const sources = (r.matches || []).map((m, idx) => ({
             id: m.reference_id || idx + 1,
             name: m.title || `Reference Document ${idx + 1}`,
-            type: "Academic Reference Corpus",
-            similarity: Math.round(m.similarity_percentage || 0),
+            type: m.type || "Academic Reference Corpus",
+            similarity: Math.round(m.similarity_percentage !== undefined ? m.similarity_percentage : (m.similarity || 0)),
+            matched_segments: m.matched_segments || [],
           }));
 
           const formattedDate = s.submitted_at
@@ -213,13 +222,14 @@ export default function PlagiarismReport() {
 
           const data = {
             id: r.id,
+            submission_id: s.id || r.submission_id,
             assignment: s.title || "Academic Assignment",
             course: courseDisplay,
             student: s.student_name || user?.name || "Student",
             submittedDate: formattedDate,
             fileName: s.filename || "document",
             status: s.status === "completed" ? "Analysis Complete" : (s.status || "Completed"),
-            similarity: Math.round(r.overall_similarity_score || 0),
+            similarity: Math.round(r.overall_similarity_score !== undefined ? r.overall_similarity_score : (r.similarity_score || 0)),
             riskLevel: r.risk_level,
             reviewStatus: riskLevelDisplay,
             sources: sources,
@@ -252,9 +262,39 @@ export default function PlagiarismReport() {
     reportData?.sources?.[0] ||
     null;
 
-  const handleDownloadClick = () => {
-    setDownloadRequested(true);
-    setTimeout(() => setDownloadRequested(false), 2500);
+  const handleExportReport = async () => {
+    if (!reportData?.id) return;
+    setIsExporting(true);
+    setDownloadError("");
+    setDownloadSuccess("");
+    try {
+      await exportPlagiarismReport(reportData.id, "html");
+      setDownloadSuccess("Official Academic Integrity Report downloaded successfully.");
+      setTimeout(() => setDownloadSuccess(""), 4000);
+    } catch (err) {
+      setDownloadError(err.message || "Failed to export report.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDownloadOriginal = async () => {
+    if (!reportData?.submission_id) {
+      setDownloadError("Submission ID not found.");
+      return;
+    }
+    setIsDownloadingOriginal(true);
+    setDownloadError("");
+    setDownloadSuccess("");
+    try {
+      await downloadSubmissionFile(reportData.submission_id, reportData.fileName);
+      setDownloadSuccess("Original submission file downloaded successfully.");
+      setTimeout(() => setDownloadSuccess(""), 4000);
+    } catch (err) {
+      setDownloadError(err.message || "Failed to download submission file.");
+    } finally {
+      setIsDownloadingOriginal(false);
+    }
   };
 
   const getRiskBadgeStyles = (risk) => {
@@ -803,33 +843,86 @@ export default function PlagiarismReport() {
                 )}
               </div>
 
-              {/* Matched Content Overview */}
+              {/* Matched Content Overview & Sentence-Level Evidence */}
               {selectedSource && (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
-                    <h2 className="text-base font-semibold text-slate-900">
-                      Matched Source Details
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Selected source:{" "}
-                      <span className="font-medium text-slate-700">
-                        {selectedSource.name}
-                      </span>
-                    </p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+                    <div>
+                      <h2 className="text-base font-semibold text-slate-900">
+                        Evidence Inspection: {selectedSource.name}
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Source Type: <span className="font-medium text-slate-700">{selectedSource.type}</span> &bull; Source Overlap: <span className="font-semibold text-emerald-700">{selectedSource.similarity}%</span>
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <MatchedTextBlock
-                      label="Submitted Assignment Document"
-                      text={`Document: "${reportData.fileName}" shows ${selectedSource.similarity}% similarity with this reference source.`}
-                    />
-                    <MatchedTextBlock
-                      label="Reference Corpus Source"
-                      text={`Reference Title: "${selectedSource.name}" — Type: ${selectedSource.type}. Comparison computed via TF-IDF Vectorization & Cosine Similarity.`}
-                    />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-3">
-                    Similarity calculated by measuring TF-IDF n-gram vectors against the academic reference corpus.
+                  {selectedSource.matched_segments && selectedSource.matched_segments.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                          Sentence-Level Matches ({selectedSource.matched_segments.length} segment{selectedSource.matched_segments.length > 1 ? "s" : ""})
+                        </h3>
+                        <span className="text-xs text-slate-500">
+                          Heuristic threshold: &ge; 60% similarity
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {selectedSource.matched_segments.map((seg, sIdx) => (
+                          <div
+                            key={sIdx}
+                            className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 transition hover:border-slate-300"
+                          >
+                            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/70">
+                              <span className="text-xs font-semibold text-slate-700">
+                                Segment #{sIdx + 1}
+                              </span>
+                              <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
+                                {Math.round(seg.similarity || 0)}% Match
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-900 mb-1">
+                                  Submitted Document Passage
+                                </p>
+                                <p className="text-xs text-slate-800 leading-relaxed italic">
+                                  &ldquo;{seg.target_snippet}&rdquo;
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                                  Matched Reference Passage
+                                </p>
+                                <p className="text-xs text-slate-700 leading-relaxed italic">
+                                  &ldquo;{seg.source_snippet}&rdquo;
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <MatchedTextBlock
+                          label="Submitted Assignment Document"
+                          text={`Document: "${reportData.fileName}" shows ${selectedSource.similarity}% similarity with this reference source.`}
+                        />
+                        <MatchedTextBlock
+                          label="Reference Corpus Source"
+                          text={`Reference Title: "${selectedSource.name}" — Type: ${selectedSource.type}. Comparison computed via TF-IDF Vectorization & Cosine Similarity.`}
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-3">
+                        Document-level similarity was detected across this reference source based on TF-IDF representation and cosine proximity. No specific verbatim sentence matches exceeded the individual segment threshold.
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-slate-400 mt-4">
+                    Similarity calculated by measuring TF-IDF n-gram vectors and sentence-level similarity against the academic reference corpus.
                   </p>
                 </div>
               )}
@@ -898,12 +991,12 @@ export default function PlagiarismReport() {
                 </div>
               </div>
 
-              {/* Recommended Action */}
+              {/* Export & Recommended Action */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
                 <h2 className="text-base font-semibold text-slate-900 mb-3">
-                  Recommended Action
+                  Export & Recommended Action
                 </h2>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div>
                     <span
                       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium mb-2 ${getRiskBadgeStyles(
@@ -913,35 +1006,57 @@ export default function PlagiarismReport() {
                       {reportData.reviewStatus}
                     </span>
                     <p className="text-sm text-slate-600">
-                      Review the matched reference sources before submitting further revisions.
+                      Review the matched reference sources before submitting further revisions. You may download the certified integrity report or retrieve your original uploaded file.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleDownloadClick}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 flex-shrink-0"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
+                  <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+                    <button
+                      type="button"
+                      disabled={isDownloadingOriginal}
+                      onClick={handleDownloadOriginal}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 12m0 0l4.5-4.5M12 12V3"
-                      />
-                    </svg>
-                    Download Report
-                  </button>
+                      {isDownloadingOriginal ? (
+                        <svg className="h-4 w-4 animate-spin text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                      )}
+                      Download Original Document
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isExporting}
+                      onClick={handleExportReport}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                    >
+                      {isExporting ? (
+                        <svg className="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 12m0 0l4.5-4.5M12 12V3" />
+                        </svg>
+                      )}
+                      Download Official Report
+                    </button>
+                  </div>
                 </div>
-                {downloadRequested && (
-                  <p className="mt-3 text-sm text-emerald-600" role="status">
-                    Report download initiated.
-                  </p>
+                {downloadSuccess && (
+                  <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800" role="status">
+                    {downloadSuccess}
+                  </div>
+                )}
+                {downloadError && (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700" role="alert">
+                    {downloadError}
+                  </div>
                 )}
               </div>
 

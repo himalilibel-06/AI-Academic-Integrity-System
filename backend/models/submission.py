@@ -393,3 +393,38 @@ def get_submissions_for_professor(connection, professor_id, course_id=None, limi
     cursor.execute(query, tuple(params))
     return cursor.fetchall()
 
+
+def get_historical_submissions_for_corpus(connection, exclude_submission_id=None, course_id=None, limit=50):
+    """
+    Retrieve historical submissions with usable processed text for plagiarism comparison.
+    Optionally prioritizes submissions from the same course and excludes the current submission.
+    """
+    cursor = connection.cursor()
+
+    query = """
+        SELECT s.id, s.title, s.filename, s.course_id, s.processed_text
+        FROM submissions s
+        WHERE s.processed_text IS NOT NULL
+          AND TRIM(s.processed_text) != ''
+          AND s.status IN ('completed', 'reviewed', 'approved')
+    """
+    params = []
+
+    if exclude_submission_id is not None:
+        query += " AND s.id != ?"
+        params.append(exclude_submission_id)
+
+    if course_id is not None:
+        query += " ORDER BY CASE WHEN s.course_id = ? THEN 0 ELSE 1 END, s.submitted_at DESC"
+        params.append(course_id)
+    else:
+        query += " ORDER BY s.submitted_at DESC"
+
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+
+    cursor.execute(query, tuple(params))
+    return cursor.fetchall()
+
+
