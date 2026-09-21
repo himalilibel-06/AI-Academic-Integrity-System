@@ -186,3 +186,22 @@ export async function changePassword({ current_password, new_password }) {
   });
 }
 
+/**
+ * Retrieve user preferences.
+ */
+export async function getUserPreferences() {
+  return apiRequest("/api/auth/preferences", {
+    method: "GET",
+  });
+}
+
+/**
+ * Save user preferences.
+ */
+export async function saveUserPreferences(preferences) {
+  return apiRequest("/api/auth/preferences", {
+    method: "PUT",
+    body: JSON.stringify(preferences),
+  });
+}
+

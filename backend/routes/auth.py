@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
@@ -10,12 +11,54 @@ from models.user import (
     get_user_by_id,
     update_user_profile,
     update_user_password,
+    update_user_preferences,
     verify_password,
 )
 from utils.auth import create_access_token, get_current_user_payload
 
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+DEFAULT_PREFERENCES = {
+    "language": "English",
+    "timeZone": "India Standard Time (IST)",
+    "dateFormat": "DD/MM/YYYY",
+    "notifications": {
+        "submissionUpdates": True,
+        "reportAvailable": True,
+        "reviewRequired": True,
+        "systemAnnouncements": False,
+    },
+    "privacy": {
+        "profileVisibility": "Institution Only",
+        "submissionHistory": True,
+        "reportVisibility": "Student and Professor",
+    },
+}
+
+
+def parse_user_preferences(raw_pref: Optional[str]) -> dict:
+    """
+    Safely parse user preferences JSON from database.
+    Falls back gracefully to default preferences if empty, missing, or malformed.
+    """
+    if not raw_pref or not str(raw_pref).strip():
+        return json.loads(json.dumps(DEFAULT_PREFERENCES))
+    try:
+        data = json.loads(raw_pref)
+        if not isinstance(data, dict):
+            return json.loads(json.dumps(DEFAULT_PREFERENCES))
+
+        merged = json.loads(json.dumps(DEFAULT_PREFERENCES))
+        for k, v in data.items():
+            if isinstance(v, dict) and isinstance(merged.get(k), dict):
+                merged[k].update(v)
+            else:
+                merged[k] = v
+        return merged
+    except Exception:
+        return json.loads(json.dumps(DEFAULT_PREFERENCES))
 
 
 class RegisterRequest(BaseModel):
@@ -40,6 +83,14 @@ class UpdateProfileRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+
+class UpdatePreferencesRequest(BaseModel):
+    language: Optional[str] = None
+    timeZone: Optional[str] = None
+    dateFormat: Optional[str] = None
+    notifications: Optional[dict] = None
+    privacy: Optional[dict] = None
 
 
 @router.post("/register")
@@ -351,6 +402,109 @@ def change_password(
         return {
             "success": True,
             "message": "Password changed successfully"
+        }
+    finally:
+        connection.close()
+
+
+@router.get("/preferences")
+def get_preferences(payload: dict = Depends(get_current_user_payload)):
+    """
+    Retrieve stored preferences for the authenticated user.
+    """
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+
+    try:
+        user_id_int = int(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID in token"
+        )
+
+    connection = get_connection()
+    try:
+        user = get_user_by_id(connection, user_id_int)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        raw_pref = user["preferences"] if "preferences" in user.keys() else "{}"
+        preferences = parse_user_preferences(raw_pref)
+
+        return {
+            "success": True,
+            "preferences": preferences
+        }
+    finally:
+        connection.close()
+
+
+@router.put("/preferences")
+def update_preferences(
+    data: UpdatePreferencesRequest,
+    payload: dict = Depends(get_current_user_payload)
+):
+    """
+    Update preferences for the authenticated user.
+    Merges updates with existing preferences.
+    """
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+
+    try:
+        user_id_int = int(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID in token"
+        )
+
+    connection = get_connection()
+    try:
+        user = get_user_by_id(connection, user_id_int)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        raw_pref = user["preferences"] if "preferences" in user.keys() else "{}"
+        current_prefs = parse_user_preferences(raw_pref)
+
+        if data.language is not None:
+            current_prefs["language"] = str(data.language).strip()
+        if data.timeZone is not None:
+            current_prefs["timeZone"] = str(data.timeZone).strip()
+        if data.dateFormat is not None:
+            current_prefs["dateFormat"] = str(data.dateFormat).strip()
+        if data.notifications is not None and isinstance(data.notifications, dict):
+            if "notifications" not in current_prefs or not isinstance(current_prefs["notifications"], dict):
+                current_prefs["notifications"] = {}
+            current_prefs["notifications"].update(data.notifications)
+        if data.privacy is not None and isinstance(data.privacy, dict):
+            if "privacy" not in current_prefs or not isinstance(current_prefs["privacy"], dict):
+                current_prefs["privacy"] = {}
+            current_prefs["privacy"].update(data.privacy)
+
+        pref_json = json.dumps(current_prefs)
+        update_user_preferences(connection, user_id_int, pref_json)
+
+        return {
+            "success": True,
+            "message": "Preferences saved successfully",
+            "preferences": current_prefs
         }
     finally:
         connection.close()
