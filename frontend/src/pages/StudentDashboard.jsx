@@ -117,9 +117,14 @@ const quickActions = [
 --------------------------------------------------------- */
 function StatusBadge({ status }) {
   const styles = {
+    Approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Reviewed: "bg-blue-50 text-blue-700 border-blue-200",
+    "Review Required": "bg-amber-50 text-amber-700 border-amber-200",
+    Flagged: "bg-rose-50 text-rose-700 border-rose-200",
+    Rejected: "bg-red-50 text-red-700 border-red-200",
+    "Analysis Complete": "bg-green-50 text-green-700 border-green-200",
     Completed: "bg-green-50 text-green-700 border-green-200",
     Processing: "bg-blue-50 text-blue-700 border-blue-200",
-    "Review Required": "bg-amber-50 text-amber-700 border-amber-200",
   };
   return (
     <span
@@ -372,6 +377,58 @@ export default function StudentDashboard() {
                 </Link>
               </section>
 
+              {/* Instructor Action Required Alert */}
+              {recentSubmissions.some(
+                (item) =>
+                  item.review_status === "review_required" ||
+                  item.review_status === "flagged" ||
+                  item.status === "Review Required" ||
+                  item.status === "Flagged"
+              ) && (
+                <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5 shadow-sm">
+                  <div className="flex items-start gap-3.5">
+                    <div className="rounded-lg bg-amber-100 p-2 text-amber-800 flex-shrink-0 mt-0.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-amber-950">
+                        Instructor Action &amp; Review Required
+                      </h3>
+                      <p className="mt-0.5 text-xs text-amber-800 leading-relaxed">
+                        One or more of your submissions have received instructor review decisions requiring discussion or revision.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {recentSubmissions
+                          .filter(
+                            (item) =>
+                              item.review_status === "review_required" ||
+                              item.review_status === "flagged" ||
+                              item.status === "Review Required" ||
+                              item.status === "Flagged"
+                          )
+                          .map((sub) => (
+                            <Link
+                              key={sub.id}
+                              to={sub.report_id ? `/student/reports/${sub.report_id}` : "/student/reports"}
+                              className="inline-flex items-center gap-2 rounded-lg bg-white border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100 transition shadow-xs"
+                            >
+                              <span className="truncate max-w-[200px]">{sub.title}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold uppercase">
+                                {sub.status}
+                              </span>
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                              </svg>
+                            </Link>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
+
               {/* Statistics */}
               <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {summaryStats.map((stat) => (
@@ -440,7 +497,16 @@ export default function StudentDashboard() {
                         <tbody>
                           {recentSubmissions.map((item) => (
                             <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                              <td className="px-6 py-4 text-slate-900 font-medium">{item.title}</td>
+                              <td className="px-6 py-4 text-slate-900 font-medium">
+                                <div>{item.title}</div>
+                                {item.professor_feedback && (
+                                  <div className="mt-0.5">
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                      Instructor Feedback Available
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
                               <td className="px-4 py-4 text-slate-600">
                                 {item.course_code ? `${item.course_code} - ` : ""}{item.course}
                               </td>

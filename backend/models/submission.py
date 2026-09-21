@@ -154,16 +154,21 @@ def get_student_dashboard_stats(connection, student_id):
     )
     completed_submissions = cursor.fetchone()[0]
 
-    # Under review submissions (risk requires review or flagged)
+    # Under review submissions (accurately accounts for automated risk and professor review decisions)
     cursor.execute(
         """
         SELECT COUNT(*)
         FROM submissions s
         LEFT JOIN plagiarism_reports r ON r.submission_id = s.id
         WHERE s.student_id = ? AND (
-            r.risk_level IN ('review_required', 'high_risk')
-            OR r.review_status = 'review_required'
+            -- Professor review decision requires review or is flagged
+            r.review_status IN ('review_required', 'flagged')
             OR s.status = 'review_required'
+            -- Automated risk requires review when no concluding professor decision has been made
+            OR (
+                (r.review_status IS NULL OR r.review_status = 'pending')
+                AND r.risk_level IN ('review_required', 'high_risk')
+            )
         )
         """,
         (student_id,)
@@ -205,7 +210,8 @@ def get_student_dashboard_stats(connection, student_id):
 
 def get_student_submissions_with_reports(connection, student_id, limit=None):
     """
-    Get all submissions by a student joined with course and report details.
+    Get all submissions by a student joined with course, report details,
+    and reviewing professor information.
     """
     cursor = connection.cursor()
 
@@ -214,10 +220,12 @@ def get_student_submissions_with_reports(connection, student_id, limit=None):
                s.file_type, s.status, s.submitted_at,
                c.name AS course_name, c.code AS course_code,
                r.id AS report_id, r.overall_similarity_score AS similarity_score,
-               r.risk_level, r.review_status
+               r.risk_level, r.review_status, r.professor_feedback, r.reviewed_at,
+               u_prof.name AS reviewed_by_name
         FROM submissions s
         LEFT JOIN courses c ON s.course_id = c.id
         LEFT JOIN plagiarism_reports r ON r.submission_id = s.id
+        LEFT JOIN users u_prof ON r.reviewed_by = u_prof.id
         WHERE s.student_id = ?
         ORDER BY s.submitted_at DESC, s.id DESC
     """

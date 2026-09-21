@@ -33,16 +33,18 @@ def create_plagiarism_report(
 
 def get_report_by_submission_id(connection, submission_id):
     """
-    Fetch plagiarism report by submission ID.
+    Fetch plagiarism report by submission ID, including reviewing professor name if available.
     """
     cursor = connection.cursor()
 
     cursor.execute(
         """
-        SELECT id, submission_id, overall_similarity_score, risk_level, matches,
-               review_status, professor_feedback, reviewed_by, reviewed_at, created_at
-        FROM plagiarism_reports
-        WHERE submission_id = ?
+        SELECT r.id, r.submission_id, r.overall_similarity_score, r.risk_level, r.matches,
+               r.review_status, r.professor_feedback, r.reviewed_by, r.reviewed_at, r.created_at,
+               u_prof.name AS reviewed_by_name
+        FROM plagiarism_reports r
+        LEFT JOIN users u_prof ON r.reviewed_by = u_prof.id
+        WHERE r.submission_id = ?
         """,
         (submission_id,)
     )
@@ -80,16 +82,18 @@ def update_report_review(
 
 def get_report_by_id(connection, report_id):
     """
-    Fetch plagiarism report by report ID.
+    Fetch plagiarism report by report ID, including reviewing professor name if available.
     """
     cursor = connection.cursor()
 
     cursor.execute(
         """
-        SELECT id, submission_id, overall_similarity_score, risk_level, matches,
-               review_status, professor_feedback, reviewed_by, reviewed_at, created_at
-        FROM plagiarism_reports
-        WHERE id = ?
+        SELECT r.id, r.submission_id, r.overall_similarity_score, r.risk_level, r.matches,
+               r.review_status, r.professor_feedback, r.reviewed_by, r.reviewed_at, r.created_at,
+               u_prof.name AS reviewed_by_name
+        FROM plagiarism_reports r
+        LEFT JOIN users u_prof ON r.reviewed_by = u_prof.id
+        WHERE r.id = ?
         """,
         (report_id,)
     )
@@ -99,16 +103,19 @@ def get_report_by_id(connection, report_id):
 
 def get_latest_report_by_student(connection, student_id):
     """
-    Fetch the latest plagiarism report submitted by a specific student.
+    Fetch the latest plagiarism report submitted by a specific student,
+    including reviewing professor name if available.
     """
     cursor = connection.cursor()
 
     cursor.execute(
         """
         SELECT r.id, r.submission_id, r.overall_similarity_score, r.risk_level, r.matches,
-               r.review_status, r.professor_feedback, r.reviewed_by, r.reviewed_at, r.created_at
+               r.review_status, r.professor_feedback, r.reviewed_by, r.reviewed_at, r.created_at,
+               u_prof.name AS reviewed_by_name
         FROM plagiarism_reports r
         JOIN submissions s ON r.submission_id = s.id
+        LEFT JOIN users u_prof ON r.reviewed_by = u_prof.id
         WHERE s.student_id = ?
         ORDER BY r.created_at DESC, r.id DESC
         LIMIT 1

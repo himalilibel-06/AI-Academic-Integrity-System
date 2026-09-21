@@ -14,15 +14,25 @@ const sidebarItems = [
 ];
 
 const statusStyles = {
+  Approved: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  Reviewed: "bg-blue-50 text-blue-700 border border-blue-200",
+  "Review Required": "bg-amber-50 text-amber-700 border border-amber-200",
+  Flagged: "bg-rose-50 text-rose-700 border border-rose-200",
+  Rejected: "bg-red-50 text-red-700 border border-red-200",
+  "Analysis Complete": "bg-green-50 text-green-700 border border-green-200",
   Completed: "bg-green-50 text-green-700 border border-green-200",
   Processing: "bg-blue-50 text-blue-700 border border-blue-200",
-  "Review Required": "bg-amber-50 text-amber-700 border border-amber-200",
 };
 
 const statusDot = {
+  Approved: "bg-emerald-500",
+  Reviewed: "bg-blue-500",
+  "Review Required": "bg-amber-500",
+  Flagged: "bg-rose-500",
+  Rejected: "bg-red-500",
+  "Analysis Complete": "bg-green-500",
   Completed: "bg-green-500",
   Processing: "bg-blue-500",
-  "Review Required": "bg-amber-500",
 };
 
 function StatusBadge({ status }) {
@@ -94,9 +104,9 @@ export default function MySubmissions() {
 
   // Compute live summary statistics
   const totalCount = submissions.length;
-  const completedCount = submissions.filter((s) => s.status === "Completed").length;
+  const completedCount = submissions.filter((s) => s.status === "Analysis Complete" || s.status === "Completed" || s.status === "Approved" || s.status === "Reviewed").length;
   const processingCount = submissions.filter((s) => s.status === "Processing").length;
-  const reviewCount = submissions.filter((s) => s.status === "Review Required").length;
+  const reviewCount = submissions.filter((s) => s.status === "Review Required" || s.status === "Flagged" || s.status === "Rejected").length;
 
   // Extract unique course names for dropdown
   const courseOptions = useMemo(() => {
@@ -118,8 +128,12 @@ export default function MySubmissions() {
         submission.course_code?.toLowerCase().includes(q) ||
         submission.filename?.toLowerCase().includes(q);
 
-      const matchesStatus =
-        statusFilter === "All" || submission.status === statusFilter;
+      let matchesStatus = true;
+      if (statusFilter === "With Feedback") {
+        matchesStatus = !!(submission.professor_feedback && submission.professor_feedback.trim());
+      } else if (statusFilter !== "All") {
+        matchesStatus = submission.status === statusFilter;
+      }
 
       const matchesCourse =
         courseFilter === "All Courses" || submission.course === courseFilter;
@@ -353,9 +367,14 @@ export default function MySubmissions() {
                   className="w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 >
                   <option value="All">All Statuses</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Processing">Processing</option>
+                  <option value="With Feedback">With Instructor Feedback</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Reviewed">Reviewed</option>
                   <option value="Review Required">Review Required</option>
+                  <option value="Flagged">Flagged</option>
+                  <option value="Rejected">Rejected</option>
+                  <option value="Analysis Complete">Analysis Complete</option>
+                  <option value="Processing">Processing</option>
                 </select>
               </div>
 
@@ -466,6 +485,16 @@ export default function MySubmissions() {
                             {submission.filename && (
                               <div className="text-xs text-slate-400 mt-0.5">{submission.filename}</div>
                             )}
+                            {submission.professor_feedback && (
+                              <div className="mt-1">
+                                <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 border border-indigo-200">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v4.02z" />
+                                  </svg>
+                                  Instructor Feedback Available
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-5 py-4 text-slate-600">
                             {submission.course_code ? `${submission.course_code} - ` : ""}{submission.course}
@@ -510,6 +539,16 @@ export default function MySubmissions() {
                           </p>
                           {submission.filename && (
                             <p className="text-xs text-slate-400 mt-0.5">{submission.filename}</p>
+                          )}
+                          {submission.professor_feedback && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 border border-indigo-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v4.02z" />
+                                </svg>
+                                Instructor Feedback Available
+                              </span>
+                            </div>
                           )}
                         </div>
                         <StatusBadge status={submission.status} />

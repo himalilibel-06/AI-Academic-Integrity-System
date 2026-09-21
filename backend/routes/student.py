@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, status
 
 from database.database import get_connection
@@ -23,14 +24,39 @@ def format_date(dt_str) -> str:
         return str(dt_str)[:10]
 
 
-def format_status(raw_status: str, risk_level: str) -> str:
-    """Map raw database status and risk level to user-friendly display status."""
-    if risk_level == "review_required":
-        return "Review Required"
-    if raw_status in ("completed", "reviewed", "approved"):
-        return "Completed"
+def format_status(raw_status: str, risk_level: str, review_status: Optional[str] = None) -> str:
+    """
+    Map raw database status, automated risk level, and professor review decision
+    to user-friendly display status with professor decision priority:
+    - approved → "Approved"
+    - reviewed → "Reviewed"
+    - review_required → "Review Required"
+    - flagged → "Flagged"
+    - rejected → "Rejected"
+    - if no professor review exists and raw processing status is completed → "Analysis Complete"
+    """
+    if review_status:
+        norm_rev = str(review_status).strip().lower()
+        if norm_rev == "approved":
+            return "Approved"
+        elif norm_rev == "reviewed":
+            return "Reviewed"
+        elif norm_rev == "review_required":
+            return "Review Required"
+        elif norm_rev == "flagged":
+            return "Flagged"
+        elif norm_rev == "rejected":
+            return "Rejected"
+
     if raw_status in ("pending", "processing"):
         return "Processing"
+
+    if raw_status in ("completed", "reviewed", "approved"):
+        return "Analysis Complete"
+
+    if risk_level == "review_required":
+        return "Review Required"
+
     return (raw_status or "Processing").capitalize()
 
 
@@ -89,7 +115,7 @@ def get_student_dashboard(payload: dict = Depends(get_current_user_payload)):
 
         recent_submissions = []
         for row in recent_rows:
-            display_status = format_status(row["status"], row["risk_level"])
+            display_status = format_status(row["status"], row["risk_level"], row["review_status"])
             recent_submissions.append({
                 "id": row["id"],
                 "title": row["title"],
@@ -104,6 +130,10 @@ def get_student_dashboard(payload: dict = Depends(get_current_user_payload)):
                     else None
                 ),
                 "risk_level": row["risk_level"],
+                "review_status": row["review_status"],
+                "professor_feedback": row["professor_feedback"],
+                "reviewed_at": str(row["reviewed_at"]) if row["reviewed_at"] else None,
+                "reviewed_by_name": row["reviewed_by_name"],
                 "report_id": row["report_id"],
                 "date": format_date(row["submitted_at"]),
                 "submitted_at": str(row["submitted_at"]) if row["submitted_at"] else None,
@@ -159,7 +189,7 @@ def get_student_submissions(payload: dict = Depends(get_current_user_payload)):
 
         submissions_list = []
         for row in submission_rows:
-            display_status = format_status(row["status"], row["risk_level"])
+            display_status = format_status(row["status"], row["risk_level"], row["review_status"])
             submissions_list.append({
                 "id": row["id"],
                 "title": row["title"],
@@ -175,6 +205,9 @@ def get_student_submissions(payload: dict = Depends(get_current_user_payload)):
                 ),
                 "risk_level": row["risk_level"],
                 "review_status": row["review_status"],
+                "professor_feedback": row["professor_feedback"],
+                "reviewed_at": str(row["reviewed_at"]) if row["reviewed_at"] else None,
+                "reviewed_by_name": row["reviewed_by_name"],
                 "report_id": row["report_id"],
                 "date": format_date(row["submitted_at"]),
                 "submitted_at": str(row["submitted_at"]) if row["submitted_at"] else None,

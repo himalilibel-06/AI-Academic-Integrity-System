@@ -210,6 +210,14 @@ export default function PlagiarismReport() {
               })
             : "Recent";
 
+          const formattedReviewDate = r.reviewed_at
+            ? new Date(r.reviewed_at).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })
+            : null;
+
           const riskLevelDisplay =
             r.risk_level === "safe"
               ? "Safe"
@@ -220,6 +228,11 @@ export default function PlagiarismReport() {
           const courseDisplay = s.course_code
             ? `${s.course_code} - ${s.course_name || ""}`.trim()
             : s.course_name || "General Course";
+
+          const hasInstructorReview = !!(
+            r.review_status &&
+            r.review_status !== "pending"
+          );
 
           const data = {
             id: r.id,
@@ -232,7 +245,12 @@ export default function PlagiarismReport() {
             status: s.status === "completed" ? "Analysis Complete" : (s.status || "Completed"),
             similarity: Math.round(r.overall_similarity_score !== undefined ? r.overall_similarity_score : (r.similarity_score || 0)),
             riskLevel: r.risk_level,
-            reviewStatus: riskLevelDisplay,
+            riskDisplay: riskLevelDisplay,
+            reviewStatus: r.review_status || "pending",
+            professorFeedback: r.professor_feedback || "",
+            reviewedAt: formattedReviewDate,
+            reviewedByName: r.reviewed_by_name || "Course Instructor",
+            hasReview: hasInstructorReview,
             sources: sources,
           };
 
@@ -295,6 +313,47 @@ export default function PlagiarismReport() {
       setDownloadError(err.message || "Failed to download submission file.");
     } finally {
       setIsDownloadingOriginal(false);
+    }
+  };
+
+  const getDecisionBadge = (decision) => {
+    switch (decision?.toLowerCase()) {
+      case "approved":
+        return {
+          label: "Approved",
+          className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+          dotColor: "bg-emerald-500",
+        };
+      case "reviewed":
+        return {
+          label: "Reviewed",
+          className: "bg-blue-50 text-blue-700 border-blue-200",
+          dotColor: "bg-blue-500",
+        };
+      case "review_required":
+        return {
+          label: "Review Required",
+          className: "bg-amber-50 text-amber-700 border-amber-200",
+          dotColor: "bg-amber-500",
+        };
+      case "flagged":
+        return {
+          label: "Flagged",
+          className: "bg-rose-50 text-rose-700 border-rose-200",
+          dotColor: "bg-rose-500",
+        };
+      case "rejected":
+        return {
+          label: "Rejected",
+          className: "bg-red-50 text-red-700 border-red-200",
+          dotColor: "bg-red-500",
+        };
+      default:
+        return {
+          label: "Pending Instructor Review",
+          className: "bg-slate-50 text-slate-600 border-slate-200",
+          dotColor: "bg-slate-400",
+        };
     }
   };
 
@@ -631,7 +690,81 @@ export default function PlagiarismReport() {
                 </dl>
               </div>
 
-              {/* Overall Result */}
+              {/* Instructor Review & Academic Decision Card */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-semibold text-slate-900">
+                        Instructor Review &amp; Academic Decision
+                      </h2>
+                      <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                        Authoritative Academic Evaluation
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Official evaluation and feedback recorded by your course instructor.
+                    </p>
+                  </div>
+                  <div>
+                    {(() => {
+                      const badge = getDecisionBadge(reportData.reviewStatus);
+                      return (
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${badge.className}`}>
+                          <span className={`h-2 w-2 rounded-full ${badge.dotColor}`} />
+                          {badge.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {reportData.hasReview ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-slate-50 rounded-lg p-4 border border-slate-200/80">
+                      <div>
+                        <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Reviewing Instructor</span>
+                        <p className="font-semibold text-slate-900 mt-0.5">{reportData.reviewedByName}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Review Decision Date</span>
+                        <p className="font-semibold text-slate-900 mt-0.5">{reportData.reviewedAt || "Recent"}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                        Instructor Guidance &amp; Feedback Notes
+                      </h3>
+                      {reportData.professorFeedback ? (
+                        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                          <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
+                            {reportData.professorFeedback}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-sm text-slate-500 italic">
+                          Instructor recorded an academic decision ({getDecisionBadge(reportData.reviewStatus).label}) without additional written comments.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center">
+                    <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">Pending Instructor Review</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                      Your course instructor has not yet recorded a final academic review decision on this submission. You will see their official verdict and feedback comments here once completed.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Overall Result - Automated Similarity Analysis */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
                 <div className="flex flex-col md:flex-row md:items-center gap-6">
                   <div className="flex-shrink-0 mx-auto md:mx-0">
@@ -640,14 +773,14 @@ export default function PlagiarismReport() {
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-3 mb-2">
                       <h2 className="text-lg font-semibold text-slate-900">
-                        Overall Similarity
+                        Automated Similarity Analysis
                       </h2>
                       <span
                         className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRiskBadgeStyles(
                           reportData.riskLevel
                         )}`}
                       >
-                        {reportData.reviewStatus}
+                        {reportData.riskDisplay}
                       </span>
                     </div>
                     <p className="text-sm text-slate-600">
@@ -655,8 +788,8 @@ export default function PlagiarismReport() {
                       similarity with the available reference material.
                     </p>
                     <p className="text-sm text-slate-500 mt-3">
-                      Similarity scores are indicators of matching content and
-                      should be reviewed together with supporting evidence.
+                      Similarity scores are algorithmic indicators of matching content and
+                      are evaluated alongside the instructor&apos;s academic review above.
                     </p>
                   </div>
                 </div>
@@ -754,7 +887,7 @@ export default function PlagiarismReport() {
                   </div>
                   <div>
                     <h2 className="text-base font-semibold text-slate-900">
-                      Status: {reportData.reviewStatus}
+                      Automated Risk Level: {reportData.riskDisplay}
                     </h2>
                     <p className="text-sm text-slate-600 mt-1">
                       {reportData.riskLevel === "safe"
@@ -764,7 +897,7 @@ export default function PlagiarismReport() {
                         : "The detected similarity is within a moderate range that may warrant academic review."}
                     </p>
                     <p className="text-sm text-slate-500 mt-2">
-                      Final academic integrity decisions are made by the course instructor.
+                      Final academic integrity decisions are made by the course instructor shown above.
                     </p>
                   </div>
                 </div>
@@ -1004,7 +1137,7 @@ export default function PlagiarismReport() {
                         reportData.riskLevel
                       )}`}
                     >
-                      {reportData.reviewStatus}
+                      {reportData.riskDisplay}
                     </span>
                     <p className="text-sm text-slate-600">
                       Review the matched reference sources before submitting further revisions. You may download the certified integrity report or retrieve your original uploaded file.

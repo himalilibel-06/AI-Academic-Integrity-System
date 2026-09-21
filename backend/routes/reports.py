@@ -116,6 +116,7 @@ def get_latest_report(payload: dict = Depends(get_current_user_payload)):
                 "review_status": report["review_status"],
                 "professor_feedback": report["professor_feedback"],
                 "reviewed_by": report["reviewed_by"],
+                "reviewed_by_name": report["reviewed_by_name"] if "reviewed_by_name" in report.keys() else None,
                 "reviewed_at": str(report["reviewed_at"]) if report["reviewed_at"] else None,
                 "created_at": str(report["created_at"]) if report["created_at"] else None,
                 "submission": {
@@ -198,6 +199,7 @@ def get_report(report_id: int, payload: dict = Depends(get_current_user_payload)
                 "review_status": report["review_status"],
                 "professor_feedback": report["professor_feedback"],
                 "reviewed_by": report["reviewed_by"],
+                "reviewed_by_name": report["reviewed_by_name"] if "reviewed_by_name" in report.keys() else None,
                 "reviewed_at": str(report["reviewed_at"]) if report["reviewed_at"] else None,
                 "created_at": str(report["created_at"]) if report["created_at"] else None,
                 "submission": {
@@ -933,6 +935,7 @@ def export_plagiarism_report(
                     "review_status": report["review_status"],
                     "professor_feedback": report["professor_feedback"],
                     "reviewed_by": report["reviewed_by"],
+                    "reviewed_by_name": report.get("reviewed_by_name"),
                     "reviewed_at": str(report["reviewed_at"]) if report["reviewed_at"] else None,
                     "created_at": str(report["created_at"]) if report["created_at"] else None,
                     "matches": matches,
