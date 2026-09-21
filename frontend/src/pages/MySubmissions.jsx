@@ -5,6 +5,7 @@ import { getStudentSubmissions } from "../service/api";
 
 const sidebarItems = [
   { label: "Dashboard", href: "/student/dashboard" },
+  { label: "Courses", href: "/student/courses" },
   { label: "Upload Submission", href: "/student/upload" },
   { label: "My Submissions", href: "/student/submissions" },
   { label: "Reports", href: "/student/reports" },

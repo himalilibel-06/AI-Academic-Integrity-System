@@ -1,7 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getProfessorCourses, createCourse } from "../service/api";
+import {
+  getProfessorCourses,
+  createCourse,
+  getCourseRoster,
+  removeStudentFromRoster,
+} from "../service/api";
 
 /* ---------------------------------------------------------
    Inline icons (no extra dependency)
@@ -253,6 +258,58 @@ export default function Courses() {
     }
   };
 
+  // Roster states and actions
+  const [rosterModalCourse, setRosterModalCourse] = useState(null);
+  const [roster, setRoster] = useState([]);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [rosterError, setRosterError] = useState("");
+  const [rosterActionSuccess, setRosterActionSuccess] = useState("");
+  const [studentToRemove, setStudentToRemove] = useState(null);
+  const [isRemovingStudent, setIsRemovingStudent] = useState(false);
+
+  const openRosterModal = async (course) => {
+    setRosterModalCourse(course);
+    setRosterLoading(true);
+    setRosterError("");
+    setRosterActionSuccess("");
+    setStudentToRemove(null);
+    try {
+      const res = await getCourseRoster(course.id);
+      setRoster(res?.roster || []);
+    } catch (err) {
+      setRosterError(err.message || "Failed to load course roster.");
+    } finally {
+      setRosterLoading(false);
+    }
+  };
+
+  const closeRosterModal = () => {
+    setRosterModalCourse(null);
+    setRoster([]);
+    setRosterError("");
+    setRosterActionSuccess("");
+    setStudentToRemove(null);
+  };
+
+  const confirmRemoveStudent = async () => {
+    if (!studentToRemove || !rosterModalCourse) return;
+    setIsRemovingStudent(true);
+    setRosterError("");
+    setRosterActionSuccess("");
+    try {
+      await removeStudentFromRoster(rosterModalCourse.id, studentToRemove.student_id);
+      setRosterActionSuccess(`Removed ${studentToRemove.student_name} from course roster.`);
+      setStudentToRemove(null);
+      const res = await getCourseRoster(rosterModalCourse.id);
+      setRoster(res?.roster || []);
+      await loadCourses();
+    } catch (err) {
+      setRosterError(err.message || "Failed to remove student from course.");
+    } finally {
+      setIsRemovingStudent(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 lg:flex">
       {/* Mobile top bar */}
@@ -493,109 +550,263 @@ export default function Courses() {
                       </span>
                     </div>
 
-                    <Link
-                      to={`/professor/submissions?course_id=${course.id}`}
-                      className="block w-full text-center rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
-                    >
-                      View Submissions
-                    </Link>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link
+                        to={`/professor/submissions?course_id=${course.id}`}
+                        className="text-center rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                      >
+                        Submissions
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => openRosterModal(course)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                        View Roster
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Modal */}
-          {modalOpen && (
+          {/* Course Roster Modal */}
+          {rosterModalCourse && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-slate-900">Add New Course</h3>
+              <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl flex flex-col max-h-[90vh] overflow-hidden">
+                {/* Roster Header */}
+                <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                        {rosterModalCourse.code}
+                      </span>
+                      <h3 className="text-base font-semibold text-slate-900">
+                        {rosterModalCourse.name} — Course Roster
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Enrolled students, submission frequency, and academic integrity metrics.
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    onClick={closeModal}
-                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    onClick={closeRosterModal}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition"
                   >
                     {icons.close({ className: "h-5 w-5" })}
                   </button>
                 </div>
 
-                {formErrors.form && (
-                  <div className="mb-4 rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700 border border-red-200">
-                    {formErrors.form}
+                {/* Status Messages */}
+                {rosterError && (
+                  <div className="mx-6 mt-4 rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700 border border-red-200 flex items-center justify-between">
+                    <span>{rosterError}</span>
+                    <button
+                      type="button"
+                      onClick={() => setRosterError("")}
+                      className="text-red-500 hover:text-red-700 font-bold"
+                    >
+                      &times;
+                    </button>
                   </div>
                 )}
 
-                <form onSubmit={handleCreateCourse} className="space-y-4">
-                  <div>
-                    <label htmlFor="course-code" className="block text-xs font-semibold text-slate-700 mb-1">
-                      Course Code <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="course-code"
-                      type="text"
-                      placeholder="e.g. CS405"
-                      value={formValues.code}
-                      onChange={handleFormChange("code")}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 ${
-                        formErrors.code
-                          ? "border-red-300 focus:ring-red-500"
-                          : "border-slate-200 focus:ring-emerald-500/40"
-                      }`}
-                    />
-                    {formErrors.code && <p className="mt-1 text-xs text-red-500">{formErrors.code}</p>}
-                  </div>
-
-                  <div>
-                    <label htmlFor="course-name" className="block text-xs font-semibold text-slate-700 mb-1">
-                      Course Title <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="course-name"
-                      type="text"
-                      placeholder="e.g. Deep Learning & Neural Networks"
-                      value={formValues.name}
-                      onChange={handleFormChange("name")}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 ${
-                        formErrors.name
-                          ? "border-red-300 focus:ring-red-500"
-                          : "border-slate-200 focus:ring-emerald-500/40"
-                      }`}
-                    />
-                    {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
-                  </div>
-
-                  <div>
-                    <label htmlFor="course-desc" className="block text-xs font-semibold text-slate-700 mb-1">
-                      Description
-                    </label>
-                    <textarea
-                      id="course-desc"
-                      rows={3}
-                      placeholder="Course overview and syllabus highlights..."
-                      value={formValues.description}
-                      onChange={handleFormChange("description")}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 resize-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                {rosterActionSuccess && (
+                  <div className="mx-6 mt-4 rounded-lg bg-emerald-50 p-3 text-xs font-medium text-emerald-800 border border-emerald-200 flex items-center justify-between">
+                    <span>{rosterActionSuccess}</span>
                     <button
                       type="button"
-                      onClick={closeModal}
-                      className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                      onClick={() => setRosterActionSuccess("")}
+                      className="text-emerald-600 hover:text-emerald-800 font-bold"
                     >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 shadow-sm disabled:opacity-50"
-                    >
-                      {isSubmitting ? "Creating..." : "Create Course"}
+                      &times;
                     </button>
                   </div>
-                </form>
+                )}
+
+                {/* Roster Table Content */}
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  {rosterLoading ? (
+                    <div className="py-12 text-center">
+                      <svg className="mx-auto h-8 w-8 animate-spin text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <p className="mt-3 text-xs font-medium text-slate-600">Loading student roster...</p>
+                    </div>
+                  ) : roster.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-semibold text-slate-800">No students enrolled</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Students must enroll in this course from their student portal before submitting work.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs text-slate-600">
+                        <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
+                          <tr>
+                            <th className="py-3 px-3 font-semibold">Student</th>
+                            <th className="py-3 px-3 font-semibold">Enrollment Date</th>
+                            <th className="py-3 px-3 font-semibold text-center">Submissions</th>
+                            <th className="py-3 px-3 font-semibold text-center">Avg Similarity</th>
+                            <th className="py-3 px-3 font-semibold text-center">Integrity Risk</th>
+                            <th className="py-3 px-3 font-semibold text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {roster.map((student) => {
+                            const riskBadge =
+                              student.risk_level === "high_risk"
+                                ? "bg-red-50 text-red-700 border-red-200"
+                                : student.risk_level === "review_required"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-200";
+
+                            const riskLabel =
+                              student.risk_level === "high_risk"
+                                ? "High Risk"
+                                : student.risk_level === "review_required"
+                                ? "Review Required"
+                                : "Safe";
+
+                            return (
+                              <tr key={student.student_id} className="hover:bg-slate-50 transition">
+                                <td className="py-3 px-3 font-medium text-slate-900">
+                                  <div>{student.student_name}</div>
+                                  <div className="text-[11px] text-slate-400 font-normal">
+                                    {student.student_email}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3 text-slate-500">
+                                  {student.enrollment_date
+                                    ? new Date(student.enrollment_date).toLocaleDateString("en-US", {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      })
+                                    : "Recent"}
+                                </td>
+                                <td className="py-3 px-3 text-center font-semibold text-slate-800">
+                                  {student.total_submissions}
+                                </td>
+                                <td className="py-3 px-3 text-center font-semibold">
+                                  <span
+                                    className={
+                                      student.average_similarity > 40
+                                        ? "text-red-600"
+                                        : student.average_similarity >= 20
+                                        ? "text-amber-600"
+                                        : "text-emerald-600"
+                                    }
+                                  >
+                                    {student.average_similarity}%
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <span
+                                    className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${riskBadge}`}
+                                  >
+                                    {riskLabel}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => setStudentToRemove(student)}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:text-red-800 hover:underline"
+                                  >
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Roster Footer */}
+                <div className="border-t border-slate-200 px-6 py-3 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+                  <span>Total Enrolled: {roster.length}</span>
+                  <button
+                    type="button"
+                    onClick={closeRosterModal}
+                    className="rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Remove Student Confirmation Dialog */}
+          {studentToRemove && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+                <div className="w-10 h-10 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="8.5" cy="7" r="4" />
+                    <line x1="18" y1="8" x2="23" y2="13" />
+                    <line x1="23" y1="8" x2="18" y2="13" />
+                  </svg>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Remove Student from Course?
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                    Are you sure you want to remove{" "}
+                    <span className="font-semibold text-slate-800">
+                      {studentToRemove.student_name}
+                    </span>{" "}
+                    ({studentToRemove.student_email}) from{" "}
+                    <span className="font-semibold text-slate-800">
+                      {rosterModalCourse?.code} - {rosterModalCourse?.name}
+                    </span>
+                    ? The student will be unenrolled and will not be able to submit further assignments without re-enrolling.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={isRemovingStudent}
+                    onClick={() => setStudentToRemove(null)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isRemovingStudent}
+                    onClick={confirmRemoveStudent}
+                    className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition disabled:opacity-50"
+                  >
+                    {isRemovingStudent ? "Removing..." : "Remove Student"}
+                  </button>
+                </div>
               </div>
             </div>
           )}

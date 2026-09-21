@@ -86,10 +86,18 @@ const icons = {
       <path d="M12 11v5.5M12 8v.01" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  courses: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" strokeLinejoin="round" />
+      <path d="M8 7h8M8 11h5" strokeLinecap="round" />
+    </svg>
+  ),
 };
 
 const navItems = [
   { label: "Dashboard", icon: icons.dashboard, to: "/student/dashboard" },
+  { label: "Courses", icon: icons.courses, to: "/student/courses" },
   { label: "Upload Submission", icon: icons.upload, to: "/student/upload" },
   { label: "My Submissions", icon: icons.submissions, to: "/student/submissions" },
   { label: "Reports", icon: icons.reports, to: "/student/reports" },
@@ -98,6 +106,7 @@ const navItems = [
 ];
 
 const quickActions = [
+  { label: "Manage Courses", description: "Enroll or view enrolled courses", to: "/student/courses", icon: icons.courses },
   { label: "Upload New Assignment", description: "Submit a new file for review", to: "/student/upload", icon: icons.upload },
   { label: "View My Submissions", description: "See all past submissions", to: "/student/submissions", icon: icons.submissions },
   { label: "View Reports", description: "Open similarity reports", to: "/student/reports", icon: icons.reports },

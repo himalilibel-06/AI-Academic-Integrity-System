@@ -3,7 +3,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from database.database import get_connection
-from models.course import get_all_courses, create_course
+from models.course import (
+    get_all_courses,
+    create_course,
+    get_course_by_id,
+    enroll_student,
+    unenroll_student,
+    is_student_enrolled,
+    get_course_roster_with_integrity_stats,
+)
 from utils.auth import get_current_user_payload
 
 router = APIRouter(prefix="/api/courses", tags=["Courses"])
@@ -109,3 +117,248 @@ def add_course(
         }
     finally:
         connection.close()
+
+
+@router.post("/{course_id}/enroll", status_code=status.HTTP_201_CREATED)
+def enroll_in_course(
+    course_id: int,
+    payload: dict = Depends(get_current_user_payload)
+):
+    """
+    Enroll the authenticated student in a course.
+    Only students are permitted to enroll.
+    """
+    user_role = payload.get("role")
+    if user_role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can enroll in courses."
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token: missing user ID."
+        )
+
+    try:
+        student_id = int(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format in token."
+        )
+
+    connection = get_connection()
+    try:
+        course = get_course_by_id(connection, course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course with ID {course_id} not found."
+            )
+
+        if is_student_enrolled(connection, course_id, student_id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"You are already enrolled in {course['code']} - {course['name']}."
+            )
+
+        enroll_student(connection, course_id, student_id)
+
+        return {
+            "success": True,
+            "message": f"Successfully enrolled in {course['code']} - {course['name']}.",
+            "course": {
+                "id": course["id"],
+                "code": course["code"],
+                "name": course["name"],
+                "description": course["description"],
+            }
+        }
+    finally:
+        connection.close()
+
+
+@router.delete("/{course_id}/enroll")
+def drop_course(
+    course_id: int,
+    payload: dict = Depends(get_current_user_payload)
+):
+    """
+    Drop/unenroll the authenticated student from a course.
+    Only students can unenroll themselves.
+    """
+    user_role = payload.get("role")
+    if user_role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can drop courses."
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token: missing user ID."
+        )
+
+    try:
+        student_id = int(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format in token."
+        )
+
+    connection = get_connection()
+    try:
+        course = get_course_by_id(connection, course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course with ID {course_id} not found."
+            )
+
+        if not is_student_enrolled(connection, course_id, student_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="You are not enrolled in this course."
+            )
+
+        unenroll_student(connection, course_id, student_id)
+
+        return {
+            "success": True,
+            "message": f"Successfully dropped course {course['code']} - {course['name']}."
+        }
+    finally:
+        connection.close()
+
+
+@router.get("/{course_id}/roster")
+def get_course_roster(
+    course_id: int,
+    payload: dict = Depends(get_current_user_payload)
+):
+    """
+    Retrieve the student roster with integrity statistics for a course.
+    Only the owning professor is permitted to view the roster.
+    """
+    user_role = payload.get("role")
+    if user_role != "professor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only professors can view course rosters."
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token: missing user ID."
+        )
+
+    try:
+        professor_id = int(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format in token."
+        )
+
+    connection = get_connection()
+    try:
+        course = get_course_by_id(connection, course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course with ID {course_id} not found."
+            )
+
+        if course["professor_id"] != professor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to view the roster for this course."
+            )
+
+        roster = get_course_roster_with_integrity_stats(connection, course_id, professor_id)
+
+        return {
+            "success": True,
+            "course": {
+                "id": course["id"],
+                "code": course["code"],
+                "name": course["name"],
+                "description": course["description"],
+            },
+            "roster": roster or [],
+            "total_students": len(roster) if roster else 0
+        }
+    finally:
+        connection.close()
+
+
+@router.delete("/{course_id}/roster/{student_id}")
+def remove_student_from_roster(
+    course_id: int,
+    student_id: int,
+    payload: dict = Depends(get_current_user_payload)
+):
+    """
+    Remove a student from a course roster.
+    Only the owning professor is permitted to remove students.
+    """
+    user_role = payload.get("role")
+    if user_role != "professor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only professors can remove students from course rosters."
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token: missing user ID."
+        )
+
+    try:
+        professor_id = int(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format in token."
+        )
+
+    connection = get_connection()
+    try:
+        course = get_course_by_id(connection, course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course with ID {course_id} not found."
+            )
+
+        if course["professor_id"] != professor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to modify this course roster."
+            )
+
+        if not is_student_enrolled(connection, course_id, student_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Student enrollment not found in this course."
+            )
+
+        unenroll_student(connection, course_id, student_id)
+
+        return {
+            "success": True,
+            "message": "Student successfully removed from course roster."
+        }
+    finally:
+        connection.close()
+

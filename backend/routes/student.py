@@ -2,6 +2,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, status
 
 from database.database import get_connection
+from models.course import get_student_courses
 from models.submission import (
     get_student_dashboard_stats,
     get_student_submissions_with_reports,
@@ -186,3 +187,57 @@ def get_student_submissions(payload: dict = Depends(get_current_user_payload)):
 
     finally:
         connection.close()
+
+
+@router.get("/courses")
+def get_student_enrolled_courses(payload: dict = Depends(get_current_user_payload)):
+    """
+    Retrieve all courses the authenticated student is currently enrolled in,
+    including course code, name, professor info, enrollment date, and submission count.
+    """
+    user_role = payload.get("role")
+    if user_role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can access enrolled courses."
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token: missing user ID."
+        )
+
+    try:
+        student_id = int(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format in token."
+        )
+
+    connection = get_connection()
+    try:
+        courses = get_student_courses(connection, student_id)
+        return {
+            "success": True,
+            "courses": [
+                {
+                    "id": c["id"],
+                    "code": c["code"],
+                    "name": c["name"],
+                    "description": c["description"] or "",
+                    "professor_id": c["professor_id"],
+                    "professor_name": c["professor_name"] or "Faculty Instructor",
+                    "professor_email": c["professor_email"] or "",
+                    "enrolled_at": str(c["enrolled_at"]) if c["enrolled_at"] else None,
+                    "submission_count": c["submission_count"] or 0,
+                }
+                for c in courses
+            ],
+            "total_courses": len(courses)
+        }
+    finally:
+        connection.close()
+

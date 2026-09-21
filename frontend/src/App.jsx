@@ -8,6 +8,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import UploadSubmission from "./pages/UploadSubmission";
 import MySubmissions from "./pages/MySubmissions";
 import PlagiarismReport from "./pages/PlagiarismReport";
+import StudentCourses from "./pages/StudentCourses";
 
 import ProfessorDashboard from "./pages/ProfessorDashboard";
 import ReviewSubmissions from "./pages/ReviewSubmissions";
@@ -93,6 +94,7 @@ export default function App() {
 
           {/* Student routes (protected) */}
           <Route path="/student/dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboard /></ProtectedRoute>} />
+          <Route path="/student/courses" element={<ProtectedRoute allowedRoles={["student"]}><StudentCourses /></ProtectedRoute>} />
           <Route path="/student/upload" element={<ProtectedRoute allowedRoles={["student"]}><UploadSubmission /></ProtectedRoute>} />
           <Route path="/student/submissions" element={<ProtectedRoute allowedRoles={["student"]}><MySubmissions /></ProtectedRoute>} />
           <Route path="/student/reports" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />

@@ -6,7 +6,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, s
 from fastapi.responses import FileResponse
 
 from database.database import get_connection
-from models.course import get_course_by_id_or_code
+from models.course import get_course_by_id_or_code, is_student_enrolled
 from models.submission import (
     create_submission,
     get_submission_by_id,
@@ -107,6 +107,13 @@ async def submit_document(
                 detail=f"Course '{clean_course_input}' does not exist. Please select a valid course."
             )
         resolved_course_id = course["id"]
+
+        # Verify authenticated student is enrolled in the selected course
+        if not is_student_enrolled(connection, resolved_course_id, student_id_int):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You are not enrolled in '{course['code']} - {course['name']}'. Please enroll in the course before submitting."
+            )
 
         # 5. Read file bytes
         file_bytes = await file.read()

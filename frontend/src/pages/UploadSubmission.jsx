@@ -1,14 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { submitAssignment, getCourses } from "../service/api";
-
-const COURSE_OPTIONS = [
-  { value: "CS401", label: "CS401 - Machine Learning" },
-  { value: "CS402", label: "CS402 - Artificial Intelligence" },
-  { value: "CS403", label: "CS403 - Database Management" },
-  { value: "CS404", label: "CS404 - Computer Networks" },
-];
+import { submitAssignment, getStudentEnrolledCourses } from "../service/api";
 
 const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt"];
 const ACCEPTED_TYPES = [
@@ -20,6 +13,7 @@ const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 const NAV_ITEMS = [
   { label: "Dashboard", to: "/student/dashboard" },
+  { label: "Courses", to: "/student/courses" },
   { label: "Upload Submission", to: "/student/upload" },
   { label: "My Submissions", to: "/student/submissions" },
   { label: "Reports", to: "/student/reports" },
@@ -51,7 +45,8 @@ export default function UploadSubmission() {
   const { logout } = useAuth();
 
   const [course, setCourse] = useState("");
-  const [coursesList, setCoursesList] = useState(COURSE_OPTIONS);
+  const [coursesList, setCoursesList] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -65,22 +60,29 @@ export default function UploadSubmission() {
 
   useEffect(() => {
     let isMounted = true;
-    async function loadCourses() {
+    async function loadEnrolledCourses() {
+      setCoursesLoading(true);
       try {
-        const response = await getCourses();
-        if (isMounted && response && response.courses && response.courses.length > 0) {
+        const response = await getStudentEnrolledCourses();
+        if (isMounted && response && response.courses) {
           const mapped = response.courses.map((c) => ({
             value: String(c.id),
             label: `${c.code} - ${c.name}`,
             code: c.code,
+            name: c.name,
           }));
           setCoursesList(mapped);
+          if (mapped.length > 0) {
+            setCourse(mapped[0].value);
+          }
         }
       } catch (err) {
-        console.warn("Could not load backend courses list; falling back to default courses.", err);
+        console.error("Failed to load enrolled courses:", err);
+      } finally {
+        if (isMounted) setCoursesLoading(false);
       }
     }
-    loadCourses();
+    loadEnrolledCourses();
     return () => {
       isMounted = false;
     };
@@ -152,7 +154,7 @@ export default function UploadSubmission() {
   };
 
   const isFormValid =
-    course !== "" && title.trim() !== "" && selectedFile !== null;
+    course !== "" && title.trim() !== "" && selectedFile !== null && coursesList.length > 0;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -416,6 +418,26 @@ export default function UploadSubmission() {
                 </h2>
 
                 <div className="space-y-5">
+                  {!coursesLoading && coursesList.length === 0 && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 space-y-2">
+                      <div className="flex items-center gap-2 font-medium">
+                        <svg className="h-5 w-5 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span>No Enrolled Courses Found</span>
+                      </div>
+                      <p className="text-xs text-amber-700">
+                        You must enroll in a course before submitting assignments for academic integrity analysis.
+                      </p>
+                      <Link
+                        to="/student/courses"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 bg-amber-200/70 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition"
+                      >
+                        Browse & Enroll in Courses &rarr;
+                      </Link>
+                    </div>
+                  )}
+
                   <div>
                     <label
                       htmlFor="course"
@@ -427,15 +449,24 @@ export default function UploadSubmission() {
                       id="course"
                       name="course"
                       value={course}
+                      disabled={coursesLoading || coursesList.length === 0}
                       onChange={(e) => setCourse(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
                     >
-                      <option value="">Select a course</option>
-                      {coursesList.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
+                      {coursesLoading ? (
+                        <option value="">Loading enrolled courses...</option>
+                      ) : coursesList.length === 0 ? (
+                        <option value="">No enrolled courses available</option>
+                      ) : (
+                        <>
+                          <option value="">Select an enrolled course</option>
+                          {coursesList.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
 

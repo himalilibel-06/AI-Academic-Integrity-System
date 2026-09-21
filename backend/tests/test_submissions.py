@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from main import app
 from database.database import initialize_database, get_connection
 from models.user import create_user, get_user_by_email
-from models.course import create_course, seed_default_courses_if_empty
+from models.course import create_course, seed_default_courses_if_empty, is_student_enrolled, enroll_student
 from models.submission import get_submission_by_id
 from models.report import get_report_by_id
 from utils.auth import create_access_token
@@ -70,6 +70,12 @@ class TestSubmissionAndReportPipeline(unittest.TestCase):
                 cls.test_course_id = create_course(
                     conn, "Artificial Intelligence", "CS402", "AI course", cls.prof_id
                 )
+
+            # Ensure test student 1 is enrolled in test courses (CS401, CS402)
+            cursor.execute("SELECT id FROM courses WHERE code IN ('CS401', 'CS402')")
+            for c_row in cursor.fetchall():
+                if not is_student_enrolled(conn, c_row[0], cls.student1_id):
+                    enroll_student(conn, c_row[0], cls.student1_id)
         finally:
             conn.close()
 

@@ -306,4 +306,49 @@ export async function exportPlagiarismReport(reportId, format = "html") {
   return true;
 }
 
+/**
+ * Get all courses the authenticated student is currently enrolled in.
+ */
+export async function getStudentEnrolledCourses() {
+  return apiRequest("/api/student/courses", {
+    method: "GET",
+  });
+}
+
+/**
+ * Enroll the authenticated student in a course by ID.
+ */
+export async function enrollInCourse(courseId) {
+  return apiRequest(`/api/courses/${courseId}/enroll`, {
+    method: "POST",
+  });
+}
+
+/**
+ * Drop / unenroll the authenticated student from a course by ID.
+ */
+export async function dropCourse(courseId) {
+  return apiRequest(`/api/courses/${courseId}/enroll`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Retrieve the student roster and integrity statistics for a course (professor only).
+ */
+export async function getCourseRoster(courseId) {
+  return apiRequest(`/api/courses/${courseId}/roster`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Remove an enrolled student from a course roster (professor only).
+ */
+export async function removeStudentFromRoster(courseId, studentId) {
+  return apiRequest(`/api/courses/${courseId}/roster/${studentId}`, {
+    method: "DELETE",
+  });
+}
+
 

@@ -71,24 +71,118 @@ def enroll_student(connection, course_id, student_id):
     return cursor.lastrowid
 
 
+def is_student_enrolled(connection, course_id, student_id):
+    """
+    Check if a student is enrolled in a specific course.
+    """
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT 1 FROM course_enrollments WHERE course_id = ? AND student_id = ? LIMIT 1",
+        (course_id, student_id)
+    )
+    return cursor.fetchone() is not None
+
+
+def unenroll_student(connection, course_id, student_id):
+    """
+    Remove a student's enrollment from a course.
+    Returns True if an enrollment was removed, False if not found.
+    """
+    cursor = connection.cursor()
+    cursor.execute(
+        "DELETE FROM course_enrollments WHERE course_id = ? AND student_id = ?",
+        (course_id, student_id)
+    )
+    connection.commit()
+    return cursor.rowcount > 0
+
+
 def get_student_courses(connection, student_id):
     """
-    Get all courses a student is enrolled in.
+    Get all courses a student is enrolled in with professor details and student submission count.
     """
     cursor = connection.cursor()
 
     cursor.execute(
         """
-        SELECT c.id, c.name, c.code, c.description, c.professor_id, ce.enrolled_at
-        FROM courses c
-        JOIN course_enrollments ce ON c.id = ce.course_id
+        SELECT
+            c.id,
+            c.code,
+            c.name,
+            c.description,
+            c.professor_id,
+            u.name AS professor_name,
+            u.email AS professor_email,
+            ce.enrolled_at,
+            COUNT(DISTINCT s.id) AS submission_count
+        FROM course_enrollments ce
+        JOIN courses c ON ce.course_id = c.id
+        LEFT JOIN users u ON c.professor_id = u.id
+        LEFT JOIN submissions s ON s.course_id = c.id AND s.student_id = ce.student_id
         WHERE ce.student_id = ?
-        ORDER BY ce.enrolled_at DESC
+        GROUP BY c.id, ce.enrolled_at
+        ORDER BY ce.enrolled_at DESC, c.id DESC
         """,
         (student_id,)
     )
 
     return cursor.fetchall()
+
+
+def get_course_roster_with_integrity_stats(connection, course_id, professor_id=None):
+    """
+    Get the course roster along with student submission count, average similarity,
+    and overall integrity risk level.
+    If professor_id is specified, verifies course ownership.
+    """
+    cursor = connection.cursor()
+
+    if professor_id is not None:
+        cursor.execute("SELECT id, professor_id FROM courses WHERE id = ?", (course_id,))
+        course = cursor.fetchone()
+        if not course or course["professor_id"] != professor_id:
+            return None
+
+    query = """
+        SELECT
+            u.id AS student_id,
+            u.name AS student_name,
+            u.email AS student_email,
+            ce.enrolled_at AS enrollment_date,
+            COUNT(DISTINCT s.id) AS total_submissions,
+            COALESCE(ROUND(AVG(r.overall_similarity_score), 1), 0.0) AS average_similarity,
+            CASE
+                WHEN COUNT(s.id) = 0 THEN 'safe'
+                WHEN MAX(CASE WHEN r.risk_level = 'high_risk' THEN 3 WHEN r.risk_level = 'review_required' THEN 2 ELSE 1 END) = 3 THEN 'high_risk'
+                WHEN MAX(CASE WHEN r.risk_level = 'high_risk' THEN 3 WHEN r.risk_level = 'review_required' THEN 2 ELSE 1 END) = 2 THEN 'review_required'
+                ELSE 'safe'
+            END AS risk_level
+        FROM course_enrollments ce
+        JOIN users u ON ce.student_id = u.id
+        LEFT JOIN submissions s ON s.student_id = u.id AND s.course_id = ce.course_id
+        LEFT JOIN plagiarism_reports r ON s.id = r.submission_id
+        WHERE ce.course_id = ?
+        GROUP BY u.id, ce.enrolled_at
+        ORDER BY ce.enrolled_at ASC, u.name ASC
+    """
+    cursor.execute(query, (course_id,))
+    rows = cursor.fetchall()
+
+    roster = []
+    for r in rows:
+        roster.append({
+            "student_id": r["student_id"],
+            "student_name": r["student_name"],
+            "student_email": r["student_email"],
+            "enrollment_date": str(r["enrollment_date"]) if r["enrollment_date"] else None,
+            "enrolled_at": str(r["enrollment_date"]) if r["enrollment_date"] else None,
+            "total_submissions": int(r["total_submissions"] or 0),
+            "average_similarity": float(r["average_similarity"] or 0.0),
+            "average_similarity_score": float(r["average_similarity"] or 0.0),
+            "risk_level": r["risk_level"] or "safe",
+            "integrity_risk_level": r["risk_level"] or "safe",
+        })
+    return roster
 
 
 def get_all_courses(connection):

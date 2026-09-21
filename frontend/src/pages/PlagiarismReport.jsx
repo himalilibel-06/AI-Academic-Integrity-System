@@ -10,6 +10,7 @@ import {
 
 const NAV_ITEMS = [
   { label: "Dashboard", to: "/student/dashboard" },
+  { label: "Courses", to: "/student/courses" },
   { label: "Upload Submission", to: "/student/upload" },
   { label: "My Submissions", to: "/student/submissions" },
   { label: "Reports", to: "/student/reports" },
