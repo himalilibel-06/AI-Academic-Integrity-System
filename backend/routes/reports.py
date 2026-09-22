@@ -14,6 +14,8 @@ from models.report import (
     update_report_review,
 )
 from models.submission import get_submission_with_details
+from models.notification import create_notification
+from models.user import get_user_preferences
 from utils.auth import get_current_user_payload
 
 router = APIRouter(prefix="/api/reports", tags=["Plagiarism Reports"])
@@ -266,7 +268,7 @@ def review_plagiarism_report(
         cursor = connection.cursor()
         cursor.execute(
             """
-            SELECT s.id, s.course_id, c.professor_id
+            SELECT s.id, s.course_id, s.student_id, s.title AS submission_title, c.professor_id
             FROM submissions s
             LEFT JOIN courses c ON s.course_id = c.id
             WHERE s.id = ?
@@ -332,6 +334,46 @@ def review_plagiarism_report(
             (new_sub_status, report["submission_id"])
         )
         connection.commit()
+
+        # Create review notification for the student (safe / non-blocking)
+        try:
+            student_id = sub_row["student_id"]
+            if student_id:
+                # Check student preferences
+                student_prefs = get_user_preferences(connection, student_id)
+                notif_prefs = student_prefs.get("notifications", {})
+                # Feature 2 setting reviewReminders / reportAvailable defaults to True
+                review_pref = notif_prefs.get("reviewReminders", notif_prefs.get("reportAvailable", True))
+
+                if review_pref:
+                    # Fetch professor name
+                    cursor.execute("SELECT name FROM users WHERE id = ?", (professor_id,))
+                    p_row = cursor.fetchone()
+                    prof_name = p_row["name"] if p_row else "Your instructor"
+
+                    sub_title = sub_row["submission_title"] or "your assignment"
+                    decision_labels = {
+                        "approved": "Approved",
+                        "reviewed": "Reviewed",
+                        "review_required": "Review Required",
+                        "flagged": "Flagged",
+                        "rejected": "Rejected",
+                    }
+                    decision_disp = decision_labels.get(db_review_status, db_review_status.capitalize())
+                    has_feedback = bool(request.professor_feedback and request.professor_feedback.strip())
+                    feedback_text = " Instructor feedback is available." if has_feedback else ""
+                    msg = f"{prof_name} recorded an academic decision ({decision_disp}) for '{sub_title}'.{feedback_text}"
+
+                    create_notification(
+                        conn=connection,
+                        user_id=student_id,
+                        title="Review Decision Updated",
+                        message=msg,
+                        notification_type="review_decision",
+                        link=f"/student/reports/{report_id}"
+                    )
+        except Exception:
+            pass
 
         return {
             "success": True,

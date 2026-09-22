@@ -121,12 +121,28 @@ def initialize_database():
         )
     """)
 
+    # 6. Notifications table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            type TEXT NOT NULL,
+            link TEXT,
+            is_read INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
     # Useful Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_courses_professor ON courses(professor_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_enrollments_student ON course_enrollments(student_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_submissions_course ON submissions(course_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_submission ON plagiarism_reports(submission_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at)")
 
     connection.commit()
     connection.close()
@@ -134,4 +150,4 @@ def initialize_database():
 
 if __name__ == "__main__":
     initialize_database()
-    print("Database initialized successfully!")
+    print("Database initialized successfully!")

@@ -139,3 +139,21 @@ def verify_password(password, password_hash):
     """
 
     return check_password_hash(password_hash, password)
+
+
+def get_user_preferences(connection, user_id: int) -> dict:
+    """
+    Retrieve and safely parse the user's preferences dictionary.
+    """
+    user = get_user_by_id(connection, user_id)
+    if not user:
+        return {}
+    raw = user["preferences"]
+    if not raw:
+        return {}
+    try:
+        import json
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}

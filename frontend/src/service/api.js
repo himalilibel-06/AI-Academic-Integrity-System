@@ -351,4 +351,32 @@ export async function removeStudentFromRoster(courseId, studentId) {
   });
 }
 
+/**
+ * Retrieve user notifications and unread count.
+ */
+export async function getNotifications(unreadOnly = false) {
+  const query = unreadOnly ? "?unread_only=true" : "";
+  return apiRequest(`/api/notifications${query}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Mark a single notification as read.
+ */
+export async function markNotificationRead(notificationId) {
+  return apiRequest(`/api/notifications/${notificationId}/read`, {
+    method: "PUT",
+  });
+}
+
+/**
+ * Mark all notifications for the authenticated user as read.
+ */
+export async function markAllNotificationsRead() {
+  return apiRequest("/api/notifications/read-all", {
+    method: "PUT",
+  });
+}
+
 

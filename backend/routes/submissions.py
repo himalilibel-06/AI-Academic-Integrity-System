@@ -14,6 +14,8 @@ from models.submission import (
     update_submission_status,
 )
 from models.report import create_plagiarism_report
+from models.user import get_user_preferences
+from models.notification import create_notification
 from utils.auth import get_current_user_payload
 from utils.document_extractor import extract_text
 from services.text_processor import preprocess_text
@@ -193,6 +195,63 @@ async def submit_document(
 
         # 12. Update submission status to completed
         update_submission_status(connection, submission_id, "completed")
+
+        # 13. Create notification for the course professor (safe / non-blocking)
+        try:
+            prof_id = course["professor_id"] if isinstance(course, dict) or hasattr(course, "__getitem__") else getattr(course, "professor_id", None)
+            if prof_id:
+                # Fetch student name
+                c_cur = connection.cursor()
+                c_cur.execute("SELECT name FROM users WHERE id = ?", (student_id_int,))
+                s_row = c_cur.fetchone()
+                student_display_name = s_row["name"] if s_row else "A student"
+                c_code = course["code"] if "code" in course.keys() else ""
+                c_name = course["name"] if "name" in course.keys() else ""
+                course_display = f"{c_code} - {c_name}".strip(" -") or "Course"
+
+                # Check professor's notification preferences
+                prof_prefs = get_user_preferences(connection, prof_id)
+                notif_prefs = prof_prefs.get("notifications", {})
+
+                is_high_similarity = (overall_similarity > 40.0 or risk_level == "high_risk")
+                # Default for highSimilarity is True if not set
+                high_sim_pref = notif_prefs.get("highSimilarity", notif_prefs.get("reviewRequired", True))
+                sub_updates_pref = notif_prefs.get("submissionUpdates", True)
+
+                target_link = f"/professor/reports/{report_id}"
+
+                if is_high_similarity:
+                    if high_sim_pref:
+                        create_notification(
+                            conn=connection,
+                            user_id=prof_id,
+                            title="High Similarity Alert",
+                            message=f"{student_display_name} submitted '{clean_title}' in {course_display} with {overall_similarity}% similarity.",
+                            notification_type="high_similarity",
+                            link=target_link
+                        )
+                    elif sub_updates_pref:
+                        create_notification(
+                            conn=connection,
+                            user_id=prof_id,
+                            title="New Submission",
+                            message=f"{student_display_name} submitted '{clean_title}' in {course_display}.",
+                            notification_type="new_submission",
+                            link=target_link
+                        )
+                else:
+                    if sub_updates_pref:
+                        create_notification(
+                            conn=connection,
+                            user_id=prof_id,
+                            title="New Submission",
+                            message=f"{student_display_name} submitted '{clean_title}' in {course_display}.",
+                            notification_type="new_submission",
+                            link=target_link
+                        )
+        except Exception:
+            # Notifications must never prevent a successful submission
+            pass
 
         return {
             "success": True,

@@ -12,6 +12,7 @@ from models.course import (
     is_student_enrolled,
     get_course_roster_with_integrity_stats,
 )
+from models.notification import create_notification
 from utils.auth import get_current_user_payload
 
 router = APIRouter(prefix="/api/courses", tags=["Courses"])
@@ -166,6 +167,29 @@ def enroll_in_course(
             )
 
         enroll_student(connection, course_id, student_id)
+
+        # Notify the course professor (safe / non-blocking)
+        try:
+            prof_id = course["professor_id"] if "professor_id" in course.keys() else getattr(course, "professor_id", None)
+            if prof_id:
+                c_cur = connection.cursor()
+                c_cur.execute("SELECT name FROM users WHERE id = ?", (student_id,))
+                s_row = c_cur.fetchone()
+                student_name = s_row["name"] if s_row else "A student"
+                c_code = course["code"] if "code" in course.keys() else ""
+                c_name = course["name"] if "name" in course.keys() else ""
+                course_display = f"{c_code} - {c_name}".strip(" -") or "Course"
+
+                create_notification(
+                    conn=connection,
+                    user_id=prof_id,
+                    title="New Course Enrollment",
+                    message=f"{student_name} enrolled in {course_display}.",
+                    notification_type="course_enrollment",
+                    link="/professor/courses"
+                )
+        except Exception:
+            pass
 
         return {
             "success": True,

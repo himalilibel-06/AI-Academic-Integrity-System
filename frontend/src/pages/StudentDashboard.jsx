@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getStudentDashboard } from "../service/api";
+import NotificationBell from "../components/NotificationBell";
 
 /* ---------------------------------------------------------
    Inline icons (no extra dependency)
@@ -296,14 +297,7 @@ export default function StudentDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-5">
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="relative p-2 text-slate-500 hover:text-slate-800"
-            >
-              {icons.bell({ className: "h-5 w-5" })}
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-            </button>
+            <NotificationBell />
             <div className="flex items-center gap-3 border-l border-slate-200 pl-5">
               <div className="h-9 w-9 rounded-full bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center">
                 {studentInfo.initials}
