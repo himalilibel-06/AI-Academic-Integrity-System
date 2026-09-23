@@ -351,4 +351,222 @@ export async function removeStudentFromRoster(courseId, studentId) {
   });
 }
 
+/**
+ * Extract plain text from manuscript file (PDF, DOCX, TXT).
+ * Foundation step: File -> Text (No AI/analysis performed).
+ */
+export async function extractManuscriptText(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiRequest("/api/manuscripts/extract-text", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+/**
+ * Extract structured academic research fields from manuscript plain text.
+ * Foundation step: Text -> Structured Research Information (No AI reasoning/validation).
+ */
+export async function extractResearchInfo({ text, file_name }) {
+  return apiRequest("/api/manuscripts/extract-research-info", {
+    method: "POST",
+    body: JSON.stringify({ text, file_name }),
+  });
+}
+
+/**
+ * Retrieve papers from the local development literature corpus.
+ */
+export async function getLiteratureCorpus(search = "", limit = 50, offset = 0) {
+  const params = new URLSearchParams();
+  if (search) params.append("search", search);
+  if (limit) params.append("limit", limit.toString());
+  if (offset) params.append("offset", offset.toString());
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/literature${queryString}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Retrieve a single paper record by its unique paper_id.
+ */
+export async function getLiteraturePaper(paperId) {
+  return apiRequest(`/api/literature/${encodeURIComponent(paperId)}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Search local literature corpus using free-text or structured research_information.
+ * Foundation step: Retrieval & Evidence Ranking (No contradiction or validation claims).
+ */
+export async function searchLiterature({ query, research_information, top_k = 10 }) {
+  return apiRequest("/api/literature/search", {
+    method: "POST",
+    body: JSON.stringify({ query, research_information, top_k }),
+  });
+}
+
+/**
+ * Perform rule-based Research Gap Contradiction Analysis against local literature evidence.
+ * Phase 6 Reasoning Layer: Relates claimed research gap to retrieved corpus evidence.
+ */
+export async function analyzeResearchGap({ research_information, top_k = 10 }) {
+  return apiRequest("/api/gap-analysis/analyze", {
+    method: "POST",
+    body: JSON.stringify({ research_information, top_k }),
+  });
+}
+
+/**
+ * Perform 6-dimension Contribution Differentiation Analysis against local literature evidence.
+ * Phase 7 Reasoning Layer: Compares proposed contribution across 6 dimensions.
+ */
+export async function analyzeContributionDifferentiation({ research_information, top_k = 10 }) {
+  return apiRequest("/api/contribution-analysis/analyze", {
+    method: "POST",
+    body: JSON.stringify({ research_information, top_k }),
+  });
+}
+
+/**
+ * Retrieve or build the Research Knowledge Graph for a specific project.
+ * Phase 8 Reasoning Layer: Graph-based concept representation.
+ */
+export async function getProjectKnowledgeGraph(projectId, topK = 5) {
+  return apiRequest(`/api/knowledge-graph/${encodeURIComponent(projectId)}?top_k=${topK}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Build Knowledge Graph from dynamic research information.
+ */
+export async function buildKnowledgeGraph({ projectId, researchInformation, topK = 5 }) {
+  return apiRequest("/api/knowledge-graph/build", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      research_information: researchInformation,
+      top_k: topK,
+    }),
+  });
+}
+
+/**
+ * Execute AI graph search algorithm (BFS, DFS, Best-First Search).
+ */
+export async function searchKnowledgeGraph({
+  startNode,
+  goalNode,
+  algorithm = "bfs",
+  nodes = null,
+  edges = null,
+  projectId = null,
+  researchInformation = null,
+}) {
+  return apiRequest("/api/knowledge-graph/search", {
+    method: "POST",
+    body: JSON.stringify({
+      start_node: startNode,
+      goal_node: goalNode,
+      algorithm,
+      nodes,
+      edges,
+      project_id: projectId,
+      research_information: researchInformation,
+    }),
+  });
+}
+
+/**
+ * Execute Rule-Based and Bayesian Evidence Reasoning over research evidence.
+ * Phase 9 Reasoning Layer: production rules, forward chaining, backward chaining, Bayesian inference.
+ */
+export async function analyzeReasoning({
+  projectId = null,
+  researchInformation = null,
+  gapAnalysis = null,
+  contributionAnalysis = null,
+  prior = 0.5,
+  backwardChainingGoal = "GAP_SUPPORTED_BY_EVIDENCE",
+  topK = 5,
+} = {}) {
+  return apiRequest("/api/reasoning/analyze", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      research_information: researchInformation,
+      gap_analysis: gapAnalysis,
+      contribution_analysis: contributionAnalysis,
+      prior,
+      backward_chaining_goal: backwardChainingGoal,
+      top_k: topK,
+    }),
+  });
+}
+
+/**
+ * Perform Evidence Coverage Audit on research claims against local literature corpus.
+ * Phase 10A: Evaluates claim coverage (Supported, Partially Supported, Insufficient).
+ */
+export async function analyzeEvidenceCoverage({
+  projectId = null,
+  manuscriptId = null,
+  claims = null,
+  researchInformation = null,
+  topK = 5,
+} = {}) {
+  return apiRequest("/api/evidence-coverage/analyze", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      manuscript_id: manuscriptId,
+      claims,
+      research_information: researchInformation,
+      top_k: topK,
+    }),
+  });
+}
+
+/**
+ * Compare two manuscript versions belonging to the same research project.
+ * Phase 10A: Deterministic field-by-field diff, change summary, and revision guidance.
+ */
+export async function compareManuscriptRevisions({
+  projectId = null,
+  previousManuscriptId = null,
+  newManuscriptId = null,
+  previousProjectId = null,
+  newProjectId = null,
+  previousResearchInfo = null,
+  newResearchInfo = null,
+  previousVersionLabel = "Version 1",
+  newVersionLabel = "Version 2",
+} = {}) {
+  return apiRequest("/api/revision-comparison/compare", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      previous_manuscript_id: previousManuscriptId,
+      new_manuscript_id: newManuscriptId,
+      previous_project_id: previousProjectId || projectId,
+      new_project_id: newProjectId || projectId,
+      previous_research_info: previousResearchInfo,
+      new_research_info: newResearchInfo,
+      previous_version_label: previousVersionLabel,
+      new_version_label: newVersionLabel,
+    }),
+  });
+}
+
+
+
+
+
+
+
+
 

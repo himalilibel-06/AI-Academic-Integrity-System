@@ -103,6 +103,9 @@ def calculate_similarity(target_text: str, historical_documents: list = None):
     """
     Compare the uploaded document with reference documents and historical submissions
     using TF-IDF, cosine similarity, and sentence-level evidence extraction.
+
+    The existing similarity fields are preserved for compatibility.
+    An additional evidence_summary is returned for the EduGuard system.
     """
     all_corpus = []
 
@@ -116,10 +119,17 @@ def calculate_similarity(target_text: str, historical_documents: list = None):
         })
 
     # 2. Relevant previous submissions
+    peer_submission_count = 0
+
     if historical_documents:
         for sub in historical_documents:
             sub_dict = dict(sub) if not isinstance(sub, dict) else sub
-            sub_text = (sub_dict.get("processed_text") or sub_dict.get("original_text") or "").strip()
+            sub_text = (
+                sub_dict.get("processed_text")
+                or sub_dict.get("original_text")
+                or ""
+            ).strip()
+
             if sub_text:
                 all_corpus.append({
                     "id": f"sub_{sub_dict['id']}",
@@ -127,31 +137,51 @@ def calculate_similarity(target_text: str, historical_documents: list = None):
                     "text": sub_text,
                     "type": "Student Submission Archive"
                 })
+                peer_submission_count += 1
 
     reference_texts = [d["text"] for d in all_corpus]
+
     if not reference_texts:
         return {
             "overall_similarity_score": 0.0,
             "risk_level": "safe",
-            "matches": []
+            "matches": [],
+            "evidence_summary": {
+                "sources_compared": 0,
+                "reference_sources_compared": 0,
+                "peer_submissions_compared": 0,
+                "matched_segments": 0,
+                "strongest_match": None,
+                "review_note": "No comparison sources were available."
+            }
         }
 
+    # 3. TF-IDF similarity calculation
     all_documents = reference_texts + [target_text]
+
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform(all_documents)
 
     target_vector = tfidf_matrix[-1]
     reference_vectors = tfidf_matrix[:-1]
 
-    similarity_scores = cosine_similarity(target_vector, reference_vectors)[0]
+    similarity_scores = cosine_similarity(
+        target_vector,
+        reference_vectors
+    )[0]
 
+    # 4. Build evidence for every comparison source
     matches = []
+
     for index, score in enumerate(similarity_scores):
         similarity_percentage = float(score) * 100
         ref_doc = all_corpus[index]
 
-        # Extract sentence-level matching segments for evidence
-        matched_segments = extract_matching_segments(target_text, ref_doc["text"], threshold=0.5)
+        matched_segments = extract_matching_segments(
+            target_text,
+            ref_doc["text"],
+            threshold=0.5
+        )
 
         matches.append({
             "reference_id": ref_doc["id"],
@@ -161,9 +191,20 @@ def calculate_similarity(target_text: str, historical_documents: list = None):
             "matched_segments": matched_segments
         })
 
-    matches.sort(key=lambda m: m["similarity_percentage"], reverse=True)
-    highest_similarity = max(similarity_scores) * 100 if len(similarity_scores) > 0 else 0.0
+    # Highest similarity first
+    matches.sort(
+        key=lambda m: m["similarity_percentage"],
+        reverse=True
+    )
 
+    # 5. Overall similarity
+    highest_similarity = (
+        max(similarity_scores) * 100
+        if len(similarity_scores) > 0
+        else 0.0
+    )
+
+    # Keep existing risk levels for compatibility
     if highest_similarity < 15:
         risk_level = "safe"
     elif highest_similarity <= 40:
@@ -171,8 +212,54 @@ def calculate_similarity(target_text: str, historical_documents: list = None):
     else:
         risk_level = "high_risk"
 
+    # 6. Count sentence-level evidence
+    total_matched_segments = sum(
+        len(match["matched_segments"])
+        for match in matches
+    )
+
+    # 7. Identify strongest comparison source
+    strongest_match = None
+
+    if matches:
+        strongest_match = {
+            "title": matches[0]["title"],
+            "type": matches[0]["type"],
+            "similarity_percentage": matches[0]["similarity_percentage"]
+        }
+
+    # 8. Generate neutral review note
+    if highest_similarity < 15:
+        review_note = (
+            "Low similarity evidence was observed across the comparison sources."
+        )
+    elif highest_similarity <= 40:
+        review_note = (
+            "Similarity evidence was observed and may benefit from teacher review."
+        )
+    else:
+        review_note = (
+            "Strong similarity evidence was observed and should be reviewed "
+            "by the teacher together with the matched passages."
+        )
+
+    # 9. Explainable evidence summary
+    evidence_summary = {
+        "sources_compared": len(all_corpus),
+        "reference_sources_compared": len(REFERENCE_CORPUS),
+        "peer_submissions_compared": peer_submission_count,
+        "matched_segments": total_matched_segments,
+        "strongest_match": strongest_match,
+        "review_note": review_note
+    }
+
+    # 10. Return existing fields + new EduGuard evidence
     return {
-        "overall_similarity_score": round(float(highest_similarity), 2),
+        "overall_similarity_score": round(
+            float(highest_similarity),
+            2
+        ),
         "risk_level": risk_level,
-        "matches": matches
+        "matches": matches,
+        "evidence_summary": evidence_summary
     }

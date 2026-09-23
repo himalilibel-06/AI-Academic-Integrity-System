@@ -7,24 +7,43 @@ def create_plagiarism_report(
     overall_similarity_score=0.0,
     risk_level="safe",
     matches=None,
-    review_status="pending"
+    review_status="pending",
+    evidence_details=None
 ):
     """
-    Create a new plagiarism report for a submission.
-    matches can be a list or dict, converted automatically to JSON string.
+    Create a new EduGuard report.
+
+    Existing similarity evidence is stored in `matches`.
+    Additional explainable evidence is stored in `evidence_details`.
     """
+
     matches_json = json.dumps(matches) if matches is not None else None
+    evidence_json = json.dumps(
+        evidence_details if evidence_details is not None else {}
+    )
 
     cursor = connection.cursor()
 
     cursor.execute(
         """
         INSERT INTO plagiarism_reports (
-            submission_id, overall_similarity_score, risk_level, matches, review_status
+            submission_id,
+            overall_similarity_score,
+            risk_level,
+            matches,
+            review_status,
+            evidence_details
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (submission_id, overall_similarity_score, risk_level, matches_json, review_status)
+        (
+            submission_id,
+            overall_similarity_score,
+            risk_level,
+            matches_json,
+            review_status,
+            evidence_json
+        )
     )
 
     connection.commit()
@@ -33,14 +52,23 @@ def create_plagiarism_report(
 
 def get_report_by_submission_id(connection, submission_id):
     """
-    Fetch plagiarism report by submission ID, including reviewing professor name if available.
+    Fetch report by submission ID, including explainable evidence.
     """
     cursor = connection.cursor()
 
     cursor.execute(
         """
-        SELECT r.id, r.submission_id, r.overall_similarity_score, r.risk_level, r.matches,
-               r.review_status, r.professor_feedback, r.reviewed_by, r.reviewed_at, r.created_at,
+        SELECT r.id,
+               r.submission_id,
+               r.overall_similarity_score,
+               r.risk_level,
+               r.matches,
+               r.review_status,
+               r.professor_feedback,
+               r.reviewed_by,
+               r.reviewed_at,
+               r.created_at,
+               r.evidence_details,
                u_prof.name AS reviewed_by_name
         FROM plagiarism_reports r
         LEFT JOIN users u_prof ON r.reviewed_by = u_prof.id
@@ -60,7 +88,7 @@ def update_report_review(
     reviewed_by=None
 ):
     """
-    Update professor review decision (e.g. approved / rejected / flag) and feedback.
+    Update professor review decision and feedback.
     """
     cursor = connection.cursor()
 
@@ -73,7 +101,12 @@ def update_report_review(
             reviewed_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
-        (review_status, professor_feedback, reviewed_by, report_id)
+        (
+            review_status,
+            professor_feedback,
+            reviewed_by,
+            report_id
+        )
     )
 
     connection.commit()
@@ -82,14 +115,23 @@ def update_report_review(
 
 def get_report_by_id(connection, report_id):
     """
-    Fetch plagiarism report by report ID, including reviewing professor name if available.
+    Fetch report by report ID, including explainable evidence.
     """
     cursor = connection.cursor()
 
     cursor.execute(
         """
-        SELECT r.id, r.submission_id, r.overall_similarity_score, r.risk_level, r.matches,
-               r.review_status, r.professor_feedback, r.reviewed_by, r.reviewed_at, r.created_at,
+        SELECT r.id,
+               r.submission_id,
+               r.overall_similarity_score,
+               r.risk_level,
+               r.matches,
+               r.review_status,
+               r.professor_feedback,
+               r.reviewed_by,
+               r.reviewed_at,
+               r.created_at,
+               r.evidence_details,
                u_prof.name AS reviewed_by_name
         FROM plagiarism_reports r
         LEFT JOIN users u_prof ON r.reviewed_by = u_prof.id
@@ -103,15 +145,24 @@ def get_report_by_id(connection, report_id):
 
 def get_latest_report_by_student(connection, student_id):
     """
-    Fetch the latest plagiarism report submitted by a specific student,
-    including reviewing professor name if available.
+    Fetch the latest report submitted by a specific student,
+    including explainable evidence.
     """
     cursor = connection.cursor()
 
     cursor.execute(
         """
-        SELECT r.id, r.submission_id, r.overall_similarity_score, r.risk_level, r.matches,
-               r.review_status, r.professor_feedback, r.reviewed_by, r.reviewed_at, r.created_at,
+        SELECT r.id,
+               r.submission_id,
+               r.overall_similarity_score,
+               r.risk_level,
+               r.matches,
+               r.review_status,
+               r.professor_feedback,
+               r.reviewed_by,
+               r.reviewed_at,
+               r.created_at,
+               r.evidence_details,
                u_prof.name AS reviewed_by_name
         FROM plagiarism_reports r
         JOIN submissions s ON r.submission_id = s.id

@@ -120,6 +120,17 @@ def initialize_database():
             FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
         )
     """)
+        # Safe migration for EduGuard explainable evidence
+    cursor.execute("PRAGMA table_info(plagiarism_reports)")
+    existing_report_columns = {
+        row["name"] for row in cursor.fetchall()
+    }
+
+    if "evidence_details" not in existing_report_columns:
+        cursor.execute(
+            "ALTER TABLE plagiarism_reports "
+            "ADD COLUMN evidence_details TEXT DEFAULT '{}'"
+        )
 
     # Useful Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_courses_professor ON courses(professor_id)")
@@ -134,4 +145,4 @@ def initialize_database():
 
 if __name__ == "__main__":
     initialize_database()
-    print("Database initialized successfully!")
+    print("Database initialized successfully!")
