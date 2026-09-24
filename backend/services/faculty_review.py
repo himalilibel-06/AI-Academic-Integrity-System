@@ -43,6 +43,23 @@ VALID_STATUSES = {
     STATUS_REVIEWED,
 }
 
+# Allowed Revision Cycle Statuses (Phase 11C)
+CYCLE_STATUS_REVIEW_STARTED = "Review Started"
+CYCLE_STATUS_REVISION_REQUESTED = "Revision Requested"
+CYCLE_STATUS_REVISION_SUBMITTED = "Revision Submitted"
+CYCLE_STATUS_REANALYSIS_AVAILABLE = "Re-analysis Available"
+CYCLE_STATUS_FOLLOWUP_REVIEW = "Follow-up Review"
+CYCLE_STATUS_REVIEW_COMPLETED = "Review Completed"
+
+VALID_CYCLE_STATUSES = {
+    CYCLE_STATUS_REVIEW_STARTED,
+    CYCLE_STATUS_REVISION_REQUESTED,
+    CYCLE_STATUS_REVISION_SUBMITTED,
+    CYCLE_STATUS_REANALYSIS_AVAILABLE,
+    CYCLE_STATUS_FOLLOWUP_REVIEW,
+    CYCLE_STATUS_REVIEW_COMPLETED,
+}
+
 COMMENT_SECTIONS = [
     "research_problem",
     "research_gap",
@@ -531,6 +548,377 @@ class FacultyReviewService:
             updated = self.get_review_by_id(clean_rev_id)
             updated["status_message"] = "Review completed"
             return updated  # type: ignore
+        finally:
+            conn.close()
+
+    # -------------------------------------------------------------
+    # Phase 11C: Manuscript & Revision Cycle Tracking Methods
+    # -------------------------------------------------------------
+
+    def get_manuscript(self, manuscript_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve manuscript record by ID."""
+        clean_id = _clean_str(manuscript_id)
+        if not clean_id:
+            return None
+
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, project_id, title, version_number, version_label, file_name, file_type, created_at
+                FROM research_manuscripts
+                WHERE id = ?
+                """,
+                (clean_id,),
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def list_manuscripts_for_project(self, project_id: str) -> List[Dict[str, Any]]:
+        """Retrieve all registered manuscript versions for a project."""
+        clean_id = _clean_str(project_id)
+        if not clean_id:
+            return []
+
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, project_id, title, version_number, version_label, file_name, file_type, created_at
+                FROM research_manuscripts
+                WHERE project_id = ?
+                ORDER BY version_number ASC, created_at ASC
+                """,
+                (clean_id,),
+            )
+            return [dict(r) for r in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def register_manuscript(self, manuscript_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Register or update a manuscript version record for a project."""
+        m_id = _clean_str(manuscript_data.get("id"))
+        p_id = _clean_str(manuscript_data.get("project_id"))
+        if not m_id:
+            raise ValueError("Manuscript ID is required.")
+        if not p_id:
+            raise ValueError("Project ID is required.")
+
+        proj = self.get_project(p_id)
+        if not proj:
+            raise ValueError(f"Research project '{p_id}' not found.")
+
+        title = _clean_str(manuscript_data.get("title")) or f"Manuscript ({m_id})"
+        v_num = int(manuscript_data.get("version_number", 1))
+        v_label = _clean_str(manuscript_data.get("version_label")) or f"Version {v_num}"
+        file_name = _clean_str(manuscript_data.get("file_name"))
+        file_type = _clean_str(manuscript_data.get("file_type")) or "PDF"
+
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO research_manuscripts (
+                    id, project_id, title, version_number, version_label, file_name, file_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    project_id = excluded.project_id,
+                    title = excluded.title,
+                    version_number = excluded.version_number,
+                    version_label = excluded.version_label,
+                    file_name = excluded.file_name,
+                    file_type = excluded.file_type
+                """,
+                (m_id, p_id, title, v_num, v_label, file_name, file_type),
+            )
+            conn.commit()
+            return self.get_manuscript(m_id)  # type: ignore
+        finally:
+            conn.close()
+
+    def record_review_cycle(self, cycle_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Record a validated revision cycle linking manuscript versions and faculty reviews.
+        Strictly validates:
+        - Project existence
+        - Same project constraint (no cross-project linking)
+        - Manuscript existence (no phantom manuscripts)
+        - Version ordering (previous_version < current_version)
+        - No numerical quality scores or approval claims
+        """
+        p_id = _clean_str(cycle_data.get("project_id"))
+        if not p_id:
+            raise ValueError("Project ID is required to record a revision cycle.")
+
+        proj = self.get_project(p_id)
+        if not proj:
+            raise ValueError(f"Research project '{p_id}' not found.")
+
+        curr_manu_id = _clean_str(cycle_data.get("current_manuscript_id"))
+        if not curr_manu_id:
+            raise ValueError("Current manuscript ID is required.")
+
+        curr_manu = self.get_manuscript(curr_manu_id)
+        if not curr_manu:
+            raise ValueError(f"Current manuscript '{curr_manu_id}' does not exist.")
+
+        if _clean_str(curr_manu.get("project_id")) != p_id:
+            raise ValueError(
+                f"Manuscripts must belong to the same research project. Manuscript '{curr_manu_id}' belongs to '{curr_manu.get('project_id')}', expected '{p_id}'."
+            )
+
+        prev_manu_id = _clean_str(cycle_data.get("previous_manuscript_id"))
+        prev_manu = None
+        if prev_manu_id:
+            prev_manu = self.get_manuscript(prev_manu_id)
+            if not prev_manu:
+                raise ValueError(f"Previous manuscript '{prev_manu_id}' does not exist.")
+
+            if _clean_str(prev_manu.get("project_id")) != p_id:
+                raise ValueError(
+                    f"Manuscripts must belong to the same research project. Previous manuscript '{prev_manu_id}' belongs to '{prev_manu.get('project_id')}', expected '{p_id}'."
+                )
+
+        # Version validation
+        curr_ver = int(cycle_data.get("current_version") or curr_manu.get("version_number") or 1)
+        prev_ver = None
+        if prev_manu:
+            prev_ver = int(cycle_data.get("previous_version") or prev_manu.get("version_number") or 1)
+            if prev_ver >= curr_ver:
+                raise ValueError(
+                    f"Invalid version ordering: previous version ({prev_ver}) must be strictly less than current version ({curr_ver})."
+                )
+
+        review_id = _clean_str(cycle_data.get("review_id"))
+        faculty_status = _clean_str(cycle_data.get("faculty_status")) or STATUS_NOT_REVIEWED
+        if faculty_status not in VALID_STATUSES:
+            faculty_status = STATUS_NOT_REVIEWED
+
+        cycle_status = _clean_str(cycle_data.get("cycle_status")) or CYCLE_STATUS_REVIEW_STARTED
+        if cycle_status not in VALID_CYCLE_STATUSES:
+            cycle_status = CYCLE_STATUS_REVIEW_STARTED
+
+        cycle_id = _clean_str(cycle_data.get("cycle_id")) or f"cycle_{p_id}_{curr_manu_id}_{uuid.uuid4().hex[:4]}"
+        notes = _clean_str(cycle_data.get("notes"))
+        now = _now_iso()
+
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO faculty_review_cycles (
+                    cycle_id, project_id, review_id, previous_manuscript_id,
+                    current_manuscript_id, previous_version, current_version,
+                    faculty_status, cycle_status, notes, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(cycle_id) DO UPDATE SET
+                    review_id = excluded.review_id,
+                    previous_manuscript_id = excluded.previous_manuscript_id,
+                    current_manuscript_id = excluded.current_manuscript_id,
+                    previous_version = excluded.previous_version,
+                    current_version = excluded.current_version,
+                    faculty_status = excluded.faculty_status,
+                    cycle_status = excluded.cycle_status,
+                    notes = excluded.notes,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    cycle_id,
+                    p_id,
+                    review_id or None,
+                    prev_manu_id or None,
+                    curr_manu_id,
+                    prev_ver,
+                    curr_ver,
+                    faculty_status,
+                    cycle_status,
+                    notes,
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+
+            cursor.execute("SELECT * FROM faculty_review_cycles WHERE cycle_id = ?", (cycle_id,))
+            row = cursor.fetchone()
+            return dict(row)
+        finally:
+            conn.close()
+
+    def get_review_history(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve chronological faculty review history and revision cycles for a project.
+        Derives cycles conservatively using existing manuscript and review data if explicit cycles
+        have not yet been stored. Returns empty list if no cycles/history exist.
+        """
+        clean_id = _clean_str(project_id)
+        if not clean_id:
+            return None
+
+        proj = self.get_project(clean_id)
+        if not proj:
+            return None
+
+        review = self.get_review_by_project_id(clean_id)
+        manuscripts = self.list_manuscripts_for_project(clean_id)
+
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT cycle_id, project_id, review_id, previous_manuscript_id,
+                       current_manuscript_id, previous_version, current_version,
+                       faculty_status, cycle_status, notes, created_at, updated_at
+                FROM faculty_review_cycles
+                WHERE project_id = ?
+                ORDER BY current_version ASC, created_at ASC
+                """,
+                (clean_id,),
+            )
+            rows = cursor.fetchall()
+            explicit_cycles = [dict(r) for r in rows]
+
+            # Build enriched cycle objects
+            formatted_cycles = []
+            if explicit_cycles:
+                for c in explicit_cycles:
+                    prev_m = self.get_manuscript(c.get("previous_manuscript_id")) if c.get("previous_manuscript_id") else None
+                    curr_m = self.get_manuscript(c.get("current_manuscript_id")) if c.get("current_manuscript_id") else None
+
+                    formatted_cycles.append({
+                        "cycle_id": c["cycle_id"],
+                        "project_id": clean_id,
+                        "review_id": c.get("review_id") or (review.get("review_id") if review else None),
+                        "previous_manuscript_id": c.get("previous_manuscript_id"),
+                        "current_manuscript_id": c.get("current_manuscript_id"),
+                        "previous_version": c.get("previous_version"),
+                        "current_version": c.get("current_version"),
+                        "previous_version_label": prev_m.get("version_label") if prev_m else (f"Version {c.get('previous_version')}" if c.get('previous_version') else None),
+                        "current_version_label": curr_m.get("version_label") if curr_m else (f"Version {c.get('current_version')}" if c.get('current_version') else "Version 1"),
+                        "faculty_status": c.get("faculty_status") or (review.get("status") if review else STATUS_NOT_REVIEWED),
+                        "cycle_status": c.get("cycle_status") or CYCLE_STATUS_REVIEW_STARTED,
+                        "reviewer_name": review.get("reviewer_name") if review else "",
+                        "notes": c.get("notes") or "",
+                        "created_at": c.get("created_at"),
+                        "updated_at": c.get("updated_at"),
+                        "actions": {
+                            "can_compare": bool(c.get("previous_manuscript_id") and c.get("current_manuscript_id")),
+                            "can_view_analysis": True,
+                            "can_review": True,
+                        },
+                    })
+            elif manuscripts:
+                # Automatic conservative cycle detection (Part 7)
+                rev_status = review.get("status") if review else STATUS_NOT_REVIEWED
+                rev_id = review.get("review_id") if review else None
+                reviewer_name = review.get("reviewer_name") if review else ""
+
+                if len(manuscripts) == 1:
+                    m1 = manuscripts[0]
+                    c_status = CYCLE_STATUS_REVIEW_STARTED
+                    if rev_status == STATUS_REVISION_REQUESTED:
+                        c_status = CYCLE_STATUS_REVISION_REQUESTED
+                    elif rev_status == STATUS_REVIEWED:
+                        c_status = CYCLE_STATUS_REVIEW_COMPLETED
+                    elif rev_status in (STATUS_FEEDBACK_PROVIDED, STATUS_IN_REVIEW):
+                        c_status = CYCLE_STATUS_REVIEW_STARTED
+
+                    formatted_cycles.append({
+                        "cycle_id": f"cycle_{clean_id}_{m1['id']}",
+                        "project_id": clean_id,
+                        "review_id": rev_id,
+                        "previous_manuscript_id": None,
+                        "current_manuscript_id": m1["id"],
+                        "previous_version": None,
+                        "current_version": m1.get("version_number", 1),
+                        "previous_version_label": None,
+                        "current_version_label": m1.get("version_label", "Version 1 — Initial Draft"),
+                        "faculty_status": rev_status,
+                        "cycle_status": c_status,
+                        "reviewer_name": reviewer_name,
+                        "notes": "Initial research manuscript submission.",
+                        "created_at": m1.get("created_at", _now_iso()),
+                        "updated_at": review.get("updated_at", _now_iso()) if review else _now_iso(),
+                        "actions": {
+                            "can_compare": False,
+                            "can_view_analysis": True,
+                            "can_review": True,
+                        },
+                    })
+                elif len(manuscripts) >= 2:
+                    m1 = manuscripts[0]
+                    m2 = manuscripts[1]
+
+                    # Cycle 1: Manuscript V1
+                    formatted_cycles.append({
+                        "cycle_id": f"cycle_{clean_id}_{m1['id']}",
+                        "project_id": clean_id,
+                        "review_id": rev_id,
+                        "previous_manuscript_id": None,
+                        "current_manuscript_id": m1["id"],
+                        "previous_version": None,
+                        "current_version": m1.get("version_number", 1),
+                        "previous_version_label": None,
+                        "current_version_label": m1.get("version_label", "Version 1 — Initial Draft"),
+                        "faculty_status": STATUS_REVISION_REQUESTED if rev_status in (STATUS_REVISION_REQUESTED, STATUS_REVIEWED) else rev_status,
+                        "cycle_status": CYCLE_STATUS_REVISION_REQUESTED if rev_status == STATUS_REVISION_REQUESTED else (CYCLE_STATUS_REVIEW_COMPLETED if rev_status == STATUS_REVIEWED else CYCLE_STATUS_REVIEW_STARTED),
+                        "reviewer_name": reviewer_name,
+                        "notes": "Initial manuscript review round.",
+                        "created_at": m1.get("created_at", _now_iso()),
+                        "updated_at": review.get("updated_at", _now_iso()) if review else _now_iso(),
+                        "actions": {
+                            "can_compare": False,
+                            "can_view_analysis": True,
+                            "can_review": True,
+                        },
+                    })
+
+                    # Cycle 2: Manuscript V2 (Revision Candidate)
+                    c2_status = CYCLE_STATUS_REVISION_SUBMITTED
+                    if rev_status == STATUS_REVIEWED:
+                        c2_status = CYCLE_STATUS_REVIEW_COMPLETED
+                    elif rev_status == STATUS_FEEDBACK_PROVIDED:
+                        c2_status = CYCLE_STATUS_FOLLOWUP_REVIEW
+
+                    formatted_cycles.append({
+                        "cycle_id": f"cycle_{clean_id}_{m2['id']}",
+                        "project_id": clean_id,
+                        "review_id": rev_id,
+                        "previous_manuscript_id": m1["id"],
+                        "current_manuscript_id": m2["id"],
+                        "previous_version": m1.get("version_number", 1),
+                        "current_version": m2.get("version_number", 2),
+                        "previous_version_label": m1.get("version_label", "Version 1 — Initial Draft"),
+                        "current_version_label": m2.get("version_label", "Version 2 — Revised Draft"),
+                        "faculty_status": rev_status,
+                        "cycle_status": c2_status,
+                        "reviewer_name": reviewer_name,
+                        "notes": "Potential revision cycle: Manuscript V2 uploaded following faculty review guidance.",
+                        "created_at": m2.get("created_at", _now_iso()),
+                        "updated_at": review.get("updated_at", _now_iso()) if review else _now_iso(),
+                        "actions": {
+                            "can_compare": True,
+                            "can_view_analysis": True,
+                            "can_review": True,
+                        },
+                    })
+
+            return {
+                "project_id": clean_id,
+                "project_title": proj.get("title", f"Research Project ({clean_id})"),
+                "cycles": formatted_cycles,
+                "total_cycles": len(formatted_cycles),
+                "latest_review_status": review.get("status") if review else STATUS_NOT_REVIEWED,
+                "latest_manuscript_version": formatted_cycles[-1]["current_version_label"] if formatted_cycles else "None",
+                "academic_guardrail": ACADEMIC_GUARDRAIL_NOTICE,
+            }
         finally:
             conn.close()
 

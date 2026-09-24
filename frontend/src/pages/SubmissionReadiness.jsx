@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { analyzeSubmissionReadiness } from "../service/api";
+import { analyzeSubmissionReadiness, getFacultyReviewHistory } from "../service/api";
 import { getResearchProjects } from "../service/projectStorage";
 import { getManuscriptsByProject, getManuscripts } from "../service/manuscriptStorage";
 
@@ -77,6 +77,18 @@ const icons = {
       <line x1="17.01" y1="12" x2="22.96" y2="12" />
     </svg>
   ),
+  history: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 14 14" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  arrowRight: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}>
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
+  ),
 };
 
 const DEFAULT_DEMO_PROJECT = {
@@ -116,6 +128,16 @@ export default function SubmissionReadiness() {
 
   // Active section filter/tab
   const [activeTab, setActiveTab] = useState("all");
+
+  // Faculty Review History state (Phase 11C)
+  const [reviewHistory, setReviewHistory] = useState(null);
+
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    getFacultyReviewHistory(selectedProjectId)
+      .then((data) => setReviewHistory(data))
+      .catch(() => setReviewHistory(null));
+  }, [selectedProjectId]);
 
   // Load projects from local storage
   useEffect(() => {
@@ -979,6 +1001,64 @@ export default function SubmissionReadiness() {
                 )}
               </div>
             )}
+
+            {/* ---------------- Faculty Review History Section (Phase 11C) ---------------- */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="border-b border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                    <span className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-md">
+                      <icons.history className="w-4 h-4" />
+                    </span>
+                    <span>Faculty Review History</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Chronological tracking of manuscript versions, faculty feedback, and revision cycles.
+                  </p>
+                </div>
+                <Link
+                  to={`/student/revision-history/${encodeURIComponent(selectedProjectId || "proj-01")}`}
+                  className="text-xs px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition flex items-center space-x-1.5 self-start sm:self-auto shadow-sm"
+                >
+                  <span>View Review History</span>
+                  <icons.arrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Latest Review Status</span>
+                  <div className="font-bold text-indigo-300">
+                    {reviewHistory?.latest_review_status || "Not Reviewed"}
+                  </div>
+                  <span className="text-[11px] text-slate-400 block">
+                    Human academic feedback status
+                  </span>
+                </div>
+
+                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Latest Revision Cycle</span>
+                  <div className="font-bold text-slate-200">
+                    {reviewHistory?.cycles && reviewHistory.cycles.length > 0
+                      ? reviewHistory.cycles[reviewHistory.cycles.length - 1].cycle_status
+                      : "Initial Cycle"}
+                  </div>
+                  <span className="text-[11px] text-slate-400 block">
+                    {reviewHistory?.total_cycles || 0} recorded cycle(s)
+                  </span>
+                </div>
+
+                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Active Manuscript Draft</span>
+                  <div className="font-bold text-slate-200 truncate">
+                    {reviewHistory?.latest_manuscript_version || "Version 1"}
+                  </div>
+                  <span className="text-[11px] text-slate-400 block">
+                    Current working manuscript
+                  </span>
+                </div>
+              </div>
+            </div>
 
             {/* ---------------- SECTION F & G: Review Checklist ---------------- */}
             {(activeTab === "all" || activeTab === "checklist") && (

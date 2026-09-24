@@ -174,6 +174,40 @@ def initialize_database():
         )
     """)
 
+    # 8. Research Manuscripts table (tracks versions per project)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS research_manuscripts (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            version_number INTEGER NOT NULL DEFAULT 1,
+            version_label TEXT NOT NULL DEFAULT 'Version 1',
+            file_name TEXT,
+            file_type TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES research_projects(id) ON DELETE CASCADE
+        )
+    """)
+
+    # 9. Faculty Review Cycles table (tracks revision cycles chronologically)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS faculty_review_cycles (
+            cycle_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            review_id TEXT,
+            previous_manuscript_id TEXT,
+            current_manuscript_id TEXT NOT NULL,
+            previous_version INTEGER,
+            current_version INTEGER NOT NULL DEFAULT 1,
+            faculty_status TEXT NOT NULL DEFAULT 'Not Reviewed',
+            cycle_status TEXT NOT NULL DEFAULT 'Review Started',
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES research_projects(id) ON DELETE CASCADE
+        )
+    """)
+
     # Seed default research projects if empty
     cursor.execute("SELECT COUNT(*) AS cnt FROM research_projects")
     if cursor.fetchone()["cnt"] == 0:
@@ -229,6 +263,56 @@ def initialize_database():
             default_projects,
         )
 
+    # Seed default research manuscripts if empty
+    cursor.execute("SELECT COUNT(*) AS cnt FROM research_manuscripts")
+    if cursor.fetchone()["cnt"] == 0:
+        default_manuscripts = [
+            (
+                "manu-01",
+                "proj-01",
+                "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
+                1,
+                "Version 1 — Initial Draft",
+                "contrastive_medical_diagnostics_v1.pdf",
+                "PDF",
+            ),
+            (
+                "manu-02",
+                "proj-01",
+                "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics (Revised)",
+                2,
+                "Version 2 — Revised Draft",
+                "contrastive_medical_diagnostics_v2_revised.docx",
+                "DOCX",
+            ),
+            (
+                "manu-03",
+                "proj-02",
+                "Differential Privacy in Federated Knowledge Graph Embeddings",
+                1,
+                "Version 1 — Initial Draft",
+                "federated_kg_differential_privacy.pdf",
+                "PDF",
+            ),
+            (
+                "manu-04",
+                "proj-03",
+                "Zero-Shot Cross-Lingual Semantic Parsing for Low-Resource Dialects",
+                1,
+                "Version 1 — Pre-Print Draft",
+                "cross_lingual_semantic_parsing_draft.txt",
+                "TXT",
+            ),
+        ]
+        cursor.executemany(
+            """
+            INSERT OR IGNORE INTO research_manuscripts (
+                id, project_id, title, version_number, version_label, file_name, file_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            default_manuscripts,
+        )
+
     # Useful Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_courses_professor ON courses(professor_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_enrollments_student ON course_enrollments(student_id)")
@@ -236,6 +320,8 @@ def initialize_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_submissions_course ON submissions(course_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_submission ON plagiarism_reports(submission_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_faculty_reviews_project ON faculty_reviews(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_research_manuscripts_project ON research_manuscripts(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_review_cycles_project ON faculty_review_cycles(project_id)")
 
     connection.commit()
     connection.close()

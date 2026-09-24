@@ -694,6 +694,25 @@ export async function getFacultyReviewProjects() {
   return apiRequest("/api/faculty-review/projects");
 }
 
+/**
+ * Retrieve chronological faculty review history and revision cycles for a project.
+ * Phase 11C: Faculty Review History & Revision Cycle Tracking.
+ */
+export async function getFacultyReviewHistory(projectId) {
+  return apiRequest(`/api/faculty-review/history/${encodeURIComponent(projectId)}`);
+}
+
+/**
+ * Record a validated revision cycle connecting manuscript versions.
+ */
+export async function createReviewCycle(cycleData) {
+  return apiRequest("/api/faculty-review/history/create-cycle", {
+    method: "POST",
+    body: JSON.stringify(cycleData),
+  });
+}
+
+
 
 
 

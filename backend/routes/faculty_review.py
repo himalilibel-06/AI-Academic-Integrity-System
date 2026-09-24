@@ -61,6 +61,28 @@ class CompleteReviewRequest(BaseModel):
     reviewer_name: Optional[str] = Field(None)
 
 
+class RecordCycleRequest(BaseModel):
+    project_id: str = Field(..., description="Target project ID")
+    current_manuscript_id: str = Field(..., description="Current manuscript ID")
+    previous_manuscript_id: Optional[str] = Field(None, description="Previous manuscript ID")
+    review_id: Optional[str] = Field(None, description="Optional faculty review reference")
+    previous_version: Optional[int] = Field(None, description="Previous version sequence number")
+    current_version: Optional[int] = Field(None, description="Current version sequence number")
+    faculty_status: Optional[str] = Field(None, description="Faculty review status")
+    cycle_status: Optional[str] = Field(None, description="Cycle workflow status")
+    notes: Optional[str] = Field(None, description="Contextual revision cycle notes")
+
+
+class RegisterManuscriptRequest(BaseModel):
+    id: str = Field(..., description="Unique manuscript ID")
+    project_id: str = Field(..., description="Associated research project ID")
+    title: str = Field(..., description="Manuscript title")
+    version_number: Optional[int] = Field(1, description="Version number")
+    version_label: Optional[str] = Field("Version 1", description="Display label")
+    file_name: Optional[str] = Field(None, description="File name")
+    file_type: Optional[str] = Field("PDF", description="File format")
+
+
 @router.post("/create", status_code=status.HTTP_200_OK)
 async def create_or_start_review(request: CreateReviewRequest):
     """
@@ -122,6 +144,95 @@ async def list_faculty_review_projects():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Unable to load faculty review projects: {str(exc)}",
         )
+
+
+@router.get("/history/{project_id}", status_code=status.HTTP_200_OK)
+async def get_faculty_review_history(project_id: str):
+    """
+    Retrieve chronological faculty review history and revision cycles for a project.
+    Phase 11C: Connects manuscript drafts, reviews, revision comparisons, and re-analysis.
+    """
+    clean_id = project_id.strip() if project_id else ""
+    if not clean_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project_id must be provided.",
+        )
+
+    history = faculty_review_service.get_review_history(clean_id)
+    if not history:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Research project '{clean_id}' not found.",
+        )
+
+    return {
+        "success": True,
+        **history,
+    }
+
+
+@router.post("/history/create-cycle", status_code=status.HTTP_200_OK)
+async def create_revision_cycle(request: RecordCycleRequest):
+    """
+    Record a validated revision cycle connecting previous and current manuscript versions.
+    Enforces same-project, valid manuscript existence, and valid version ordering.
+    """
+    try:
+        cycle = faculty_review_service.record_review_cycle(request.model_dump())
+        return {
+            "success": True,
+            "cycle": cycle,
+            "message": "Revision cycle recorded successfully.",
+        }
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "not found" in err_msg.lower() or "does not exist" in err_msg.lower():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=err_msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error recording revision cycle: {str(exc)}",
+        )
+
+
+@router.post("/manuscripts/register", status_code=status.HTTP_200_OK)
+async def register_research_manuscript(request: RegisterManuscriptRequest):
+    """
+    Register a manuscript version for a research project.
+    """
+    try:
+        manu = faculty_review_service.register_manuscript(request.model_dump())
+        return {
+            "success": True,
+            "manuscript": manu,
+            "message": "Manuscript registered successfully.",
+        }
+    except ValueError as val_err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(val_err))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error registering manuscript: {str(exc)}",
+        )
+
+
+@router.get("/manuscripts/{project_id}", status_code=status.HTTP_200_OK)
+async def list_project_manuscripts(project_id: str):
+    """
+    List all registered manuscript versions for a project.
+    """
+    clean_id = project_id.strip() if project_id else ""
+    if not clean_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="project_id required.")
+
+    manus = faculty_review_service.list_manuscripts_for_project(clean_id)
+    return {
+        "success": True,
+        "project_id": clean_id,
+        "manuscripts": manus,
+    }
 
 
 @router.get("/{project_id}", status_code=status.HTTP_200_OK)

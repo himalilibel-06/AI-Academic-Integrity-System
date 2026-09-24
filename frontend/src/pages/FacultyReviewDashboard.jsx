@@ -471,8 +471,16 @@ export default function FacultyReviewDashboard() {
                         </h2>
                       </div>
 
-                      {/* Action Button */}
-                      <div className="flex items-center space-x-2 self-start md:self-center">
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
+                        <Link
+                          to={`/faculty/review-history/${encodeURIComponent(proj.project_id)}`}
+                          className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition flex items-center space-x-1.5"
+                          title="View chronological revision cycles and review history"
+                        >
+                          <icons.clipboardCheck className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Review History</span>
+                        </Link>
                         <Link
                           to={`/faculty/review/${encodeURIComponent(proj.project_id)}`}
                           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center space-x-1.5 shadow-md shadow-indigo-900/20"
