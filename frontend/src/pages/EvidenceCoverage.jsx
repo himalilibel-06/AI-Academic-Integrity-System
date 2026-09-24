@@ -208,6 +208,9 @@ export default function EvidenceCoverage() {
             <Link to="/student/revision-comparison" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
               Revision Comparison
             </Link>
+            <Link to="/student/submission-readiness" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
+              Submission Readiness
+            </Link>
             <Link to="/student/gap-analysis" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
               Gap Analysis
             </Link>

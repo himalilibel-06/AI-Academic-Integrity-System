@@ -163,6 +163,7 @@ const NAV_ITEMS = [
   { label: "Reasoning Workbench", icon: icons.sparkles, to: "/student/reasoning", implemented: true },
   { label: "Evidence Coverage", icon: icons.evidenceReports, to: "/student/evidence-coverage", implemented: true },
   { label: "Revision Comparison", icon: icons.revisionHistory, to: "/student/revision-comparison", implemented: true },
+  { label: "Submission Readiness", icon: icons.check, to: "/student/submission-readiness", implemented: true },
   { label: "Profile", icon: icons.profile, to: "/student/profile", implemented: true },
   { label: "Settings", icon: icons.settings, to: "/student/settings", implemented: true },
 ];

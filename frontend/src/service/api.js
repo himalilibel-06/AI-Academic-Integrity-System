@@ -562,6 +562,43 @@ export async function compareManuscriptRevisions({
   });
 }
 
+/**
+ * Generate explainable Submission Readiness Report.
+ * Phase 10B: Aggregates existing gap, contribution, evidence, and revision analyses.
+ */
+export async function analyzeSubmissionReadiness({
+  projectId = null,
+  manuscriptId = null,
+  previousManuscriptId = null,
+  researchInformation = null,
+  previousResearchInfo = null,
+  claims = null,
+  gapAnalysis = null,
+  contributionAnalysis = null,
+  evidenceCoverage = null,
+  reasoningAnalysis = null,
+  revisionComparison = null,
+  topK = 5,
+} = {}) {
+  return apiRequest("/api/submission-readiness/analyze", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      manuscript_id: manuscriptId,
+      previous_manuscript_id: previousManuscriptId,
+      research_information: researchInformation,
+      previous_research_info: previousResearchInfo,
+      claims,
+      gap_analysis: gapAnalysis,
+      contribution_analysis: contributionAnalysis,
+      evidence_coverage: evidenceCoverage,
+      reasoning_analysis: reasoningAnalysis,
+      revision_comparison: revisionComparison,
+      top_k: topK,
+    }),
+  });
+}
+
 
 
 

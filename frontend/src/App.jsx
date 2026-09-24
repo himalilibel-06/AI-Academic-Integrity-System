@@ -15,6 +15,7 @@ import KnowledgeGraph from "./pages/KnowledgeGraph";
 import ReasoningWorkbench from "./pages/ReasoningWorkbench";
 import EvidenceCoverage from "./pages/EvidenceCoverage";
 import RevisionComparison from "./pages/RevisionComparison";
+import SubmissionReadiness from "./pages/SubmissionReadiness";
 import PlagiarismReport from "./pages/PlagiarismReport";
 import StudentCourses from "./pages/StudentCourses";
 
@@ -113,6 +114,7 @@ export default function App() {
           <Route path="/student/reasoning" element={<ProtectedRoute allowedRoles={["student"]}><ReasoningWorkbench /></ProtectedRoute>} />
           <Route path="/student/evidence-coverage" element={<ProtectedRoute allowedRoles={["student"]}><EvidenceCoverage /></ProtectedRoute>} />
           <Route path="/student/revision-comparison" element={<ProtectedRoute allowedRoles={["student"]}><RevisionComparison /></ProtectedRoute>} />
+          <Route path="/student/submission-readiness" element={<ProtectedRoute allowedRoles={["student"]}><SubmissionReadiness /></ProtectedRoute>} />
           <Route path="/student/submissions" element={<ProtectedRoute allowedRoles={["student"]}><MySubmissions /></ProtectedRoute>} />
           <Route path="/student/reports" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
           <Route path="/student/reports/:id" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
