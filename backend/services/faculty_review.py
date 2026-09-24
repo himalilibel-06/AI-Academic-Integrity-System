@@ -87,7 +87,7 @@ class FacultyReviewService:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT id, title, domain, research_problem, research_objective,
+                SELECT id, title, domain, student_id, research_problem, research_objective,
                        claimed_research_gap, proposed_method, expected_contribution, created_at
                 FROM research_projects
                 WHERE id = ?
@@ -109,6 +109,7 @@ class FacultyReviewService:
 
         title = _clean_str(project_data.get("title")) or f"Research Project ({proj_id})"
         domain = _clean_str(project_data.get("domain"))
+        student_id = _clean_str(project_data.get("student_id"))
         problem = _clean_str(project_data.get("research_problem"))
         objective = _clean_str(project_data.get("research_objective"))
         gap = _clean_str(project_data.get("claimed_research_gap"))
@@ -121,22 +122,115 @@ class FacultyReviewService:
             cursor.execute(
                 """
                 INSERT INTO research_projects (
-                    id, title, domain, research_problem, research_objective,
+                    id, title, domain, student_id, research_problem, research_objective,
                     claimed_research_gap, proposed_method, expected_contribution
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     title = excluded.title,
                     domain = excluded.domain,
+                    student_id = CASE WHEN excluded.student_id != '' THEN excluded.student_id ELSE research_projects.student_id END,
                     research_problem = excluded.research_problem,
                     research_objective = excluded.research_objective,
                     claimed_research_gap = excluded.claimed_research_gap,
                     proposed_method = excluded.proposed_method,
                     expected_contribution = excluded.expected_contribution
                 """,
-                (proj_id, title, domain, problem, objective, gap, method, contribution),
+                (proj_id, title, domain, student_id, problem, objective, gap, method, contribution),
             )
             conn.commit()
             return self.get_project(proj_id)  # type: ignore
+        finally:
+            conn.close()
+
+    def list_projects_for_review(self) -> Dict[str, Any]:
+        """
+        List all research projects available for faculty review.
+        Derives review status dynamically from existing faculty review records.
+        Calculates summary counts for workflow management without scores or rankings.
+        """
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, title, domain, student_id, research_problem, research_objective,
+                       claimed_research_gap, proposed_method, expected_contribution, created_at
+                FROM research_projects
+                ORDER BY created_at ASC
+                """
+            )
+            project_rows = cursor.fetchall()
+
+            # Retrieve latest review record for each project
+            cursor.execute(
+                """
+                SELECT review_id, project_id, project_title, student_id, reviewer_id,
+                       reviewer_name, status, recommendations, created_at, updated_at
+                FROM faculty_reviews
+                ORDER BY updated_at DESC
+                """
+            )
+            review_rows = cursor.fetchall()
+
+            # Map the latest review by project_id
+            latest_reviews: Dict[str, Dict[str, Any]] = {}
+            for r in review_rows:
+                r_dict = dict(r)
+                pid = r_dict.get("project_id")
+                if pid and pid not in latest_reviews:
+                    latest_reviews[pid] = r_dict
+
+            projects_list = []
+            status_counts = {
+                "total": len(project_rows),
+                "not_reviewed": 0,
+                "in_review": 0,
+                "feedback_provided": 0,
+                "revision_requested": 0,
+                "reviewed": 0,
+            }
+
+            for p in project_rows:
+                p_dict = dict(p)
+                pid = p_dict["id"]
+                rev = latest_reviews.get(pid)
+
+                review_status = rev.get("status") if rev else STATUS_NOT_REVIEWED
+                review_id = rev.get("review_id") if rev else None
+                # Student ID safely derived without fabricating a student name
+                student_id = (rev.get("student_id") if rev else "") or p_dict.get("student_id") or ""
+                reviewer_name = rev.get("reviewer_name") if rev else ""
+                updated_at = (rev.get("updated_at") if rev else "") or p_dict.get("created_at") or _now_iso()
+
+                if review_status == STATUS_NOT_REVIEWED:
+                    status_counts["not_reviewed"] += 1
+                elif review_status == STATUS_IN_REVIEW:
+                    status_counts["in_review"] += 1
+                elif review_status == STATUS_FEEDBACK_PROVIDED:
+                    status_counts["feedback_provided"] += 1
+                elif review_status == STATUS_REVISION_REQUESTED:
+                    status_counts["revision_requested"] += 1
+                elif review_status == STATUS_REVIEWED:
+                    status_counts["reviewed"] += 1
+
+                projects_list.append({
+                    "project_id": pid,
+                    "project_title": p_dict.get("title") or f"Research Project ({pid})",
+                    "domain": p_dict.get("domain") or "",
+                    "student_id": student_id,
+                    "review_id": review_id,
+                    "review_status": review_status,
+                    "reviewer_name": reviewer_name,
+                    "updated_at": updated_at,
+                    "research_problem": p_dict.get("research_problem") or "",
+                    "claimed_research_gap": p_dict.get("claimed_research_gap") or "",
+                })
+
+            return {
+                "projects": projects_list,
+                "counts": status_counts,
+                "academic_guardrail": ACADEMIC_GUARDRAIL_NOTICE,
+            }
         finally:
             conn.close()
 

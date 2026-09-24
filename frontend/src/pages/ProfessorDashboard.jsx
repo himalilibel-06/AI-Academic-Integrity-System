@@ -104,7 +104,7 @@ const icons = {
 const navItems = [
   { label: "Dashboard", icon: icons.dashboard, to: "/professor/dashboard" },
   { label: "Submissions", icon: icons.submissions, to: "/professor/submissions" },
-  { label: "Faculty Review", icon: icons.docCheck, to: "/faculty/review/proj-01" },
+  { label: "Faculty Review Dashboard", icon: icons.docCheck, to: "/faculty/reviews" },
   { label: "Reports", icon: icons.reports, to: "/professor/reports" },
   { label: "Courses", icon: icons.courses, to: "/professor/courses" },
   { label: "Profile", icon: icons.profile, to: "/professor/profile" },
@@ -112,7 +112,7 @@ const navItems = [
 ];
 
 const quickActions = [
-  { label: "Faculty Review", description: "Review student research projects", to: "/faculty/review/proj-01", icon: icons.docCheck },
+  { label: "Faculty Review Dashboard", description: "Review and manage student research projects", to: "/faculty/reviews", icon: icons.docCheck },
   { label: "Review Submissions", description: "Open pending student submissions", to: "/professor/submissions", icon: icons.submissions },
   { label: "View Reports", description: "Open similarity reports", to: "/professor/reports", icon: icons.reports },
   { label: "View Courses", description: "See all courses you teach", to: "/professor/courses", icon: icons.courses },

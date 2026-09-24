@@ -23,6 +23,7 @@ import StudentCourses from "./pages/StudentCourses";
 import ProfessorDashboard from "./pages/ProfessorDashboard";
 import ReviewSubmissions from "./pages/ReviewSubmissions";
 import FacultyReview from "./pages/FacultyReview";
+import FacultyReviewDashboard from "./pages/FacultyReviewDashboard";
 import ReportReview from "./pages/ReportReview";
 import Courses from "./pages/Courses";
 
@@ -127,6 +128,8 @@ export default function App() {
           {/* Professor routes (protected) */}
           <Route path="/professor/dashboard" element={<ProtectedRoute allowedRoles={["professor"]}><ProfessorDashboard /></ProtectedRoute>} />
           <Route path="/professor/submissions" element={<ProtectedRoute allowedRoles={["professor"]}><ReviewSubmissions /></ProtectedRoute>} />
+          <Route path="/professor/reviews" element={<ProtectedRoute allowedRoles={["professor"]}><FacultyReviewDashboard /></ProtectedRoute>} />
+          <Route path="/faculty/reviews" element={<ProtectedRoute allowedRoles={["professor"]}><FacultyReviewDashboard /></ProtectedRoute>} />
           <Route path="/professor/review/:projectId" element={<ProtectedRoute allowedRoles={["professor"]}><FacultyReview /></ProtectedRoute>} />
           <Route path="/faculty/review/:projectId" element={<ProtectedRoute allowedRoles={["professor"]}><FacultyReview /></ProtectedRoute>} />
           <Route path="/professor/reports" element={<ProtectedRoute allowedRoles={["professor"]}><ReportReview /></ProtectedRoute>} />

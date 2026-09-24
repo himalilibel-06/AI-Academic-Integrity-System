@@ -138,6 +138,7 @@ def initialize_database():
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             domain TEXT,
+            student_id TEXT DEFAULT '',
             research_problem TEXT,
             research_objective TEXT,
             claimed_research_gap TEXT,
@@ -146,6 +147,15 @@ def initialize_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("PRAGMA table_info(research_projects)")
+    existing_project_columns = {
+        row["name"] for row in cursor.fetchall()
+    }
+    if "student_id" not in existing_project_columns:
+        cursor.execute(
+            "ALTER TABLE research_projects "
+            "ADD COLUMN student_id TEXT DEFAULT ''"
+        )
 
     # 7. Faculty Reviews table
     cursor.execute("""

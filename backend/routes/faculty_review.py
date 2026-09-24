@@ -104,6 +104,26 @@ async def create_or_start_review(request: CreateReviewRequest):
         )
 
 
+@router.get("/projects", status_code=status.HTTP_200_OK)
+async def list_faculty_review_projects():
+    """
+    List all research projects available for faculty review.
+    Phase 11B: Derives review status dynamically from existing faculty review records.
+    Provides counts for workflow management without scores or rankings.
+    """
+    try:
+        data = faculty_review_service.list_projects_for_review()
+        return {
+            "success": True,
+            **data,
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unable to load faculty review projects: {str(exc)}",
+        )
+
+
 @router.get("/{project_id}", status_code=status.HTTP_200_OK)
 async def get_faculty_review_for_project(project_id: str):
     """

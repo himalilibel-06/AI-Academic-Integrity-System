@@ -686,6 +686,15 @@ export async function completeFacultyReview({
   });
 }
 
+/**
+ * Retrieve all research projects with faculty review statuses and metadata.
+ * Phase 11B: Faculty Review Dashboard.
+ */
+export async function getFacultyReviewProjects() {
+  return apiRequest("/api/faculty-review/projects");
+}
+
+
 
 
 
