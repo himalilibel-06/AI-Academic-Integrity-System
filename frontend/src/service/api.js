@@ -599,10 +599,92 @@ export async function analyzeSubmissionReadiness({
   });
 }
 
+/**
+ * Start or retrieve active faculty review for a research project.
+ * Phase 11A: Faculty Review & Research Feedback.
+ */
+export async function createFacultyReview({
+  projectId,
+  reviewerName = null,
+  reviewerId = null,
+  studentId = null,
+  initialStatus = "In Review",
+}) {
+  return apiRequest("/api/faculty-review/create", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      reviewer_name: reviewerName,
+      reviewer_id: reviewerId,
+      student_id: studentId,
+      initial_status: initialStatus,
+    }),
+  });
+}
 
+/**
+ * Retrieve faculty review for a project by project ID.
+ */
+export async function getFacultyReview(projectId) {
+  return apiRequest(`/api/faculty-review/${encodeURIComponent(projectId)}`);
+}
 
+/**
+ * Save faculty feedback comments and overall recommendations.
+ */
+export async function saveFacultyFeedback({
+  reviewId,
+  comments = {},
+  recommendations = "",
+  reviewerName = null,
+}) {
+  return apiRequest(`/api/faculty-review/${encodeURIComponent(reviewId)}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      comments,
+      recommendations,
+      reviewer_name: reviewerName,
+    }),
+  });
+}
 
+/**
+ * Request manuscript revision with qualitative faculty guidance.
+ */
+export async function requestFacultyRevision({
+  reviewId,
+  comments = {},
+  recommendations = "",
+  reviewerName = null,
+}) {
+  return apiRequest(`/api/faculty-review/${encodeURIComponent(reviewId)}/request-revision`, {
+    method: "POST",
+    body: JSON.stringify({
+      comments,
+      recommendations,
+      reviewer_name: reviewerName,
+    }),
+  });
+}
 
+/**
+ * Mark faculty review as completed (status: 'Reviewed').
+ */
+export async function completeFacultyReview({
+  reviewId,
+  comments = {},
+  recommendations = "",
+  reviewerName = null,
+}) {
+  return apiRequest(`/api/faculty-review/${encodeURIComponent(reviewId)}/complete`, {
+    method: "POST",
+    body: JSON.stringify({
+      comments,
+      recommendations,
+      reviewer_name: reviewerName,
+    }),
+  });
+}
 
 
 

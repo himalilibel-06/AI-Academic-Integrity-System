@@ -16,11 +16,13 @@ import ReasoningWorkbench from "./pages/ReasoningWorkbench";
 import EvidenceCoverage from "./pages/EvidenceCoverage";
 import RevisionComparison from "./pages/RevisionComparison";
 import SubmissionReadiness from "./pages/SubmissionReadiness";
+import FacultyFeedback from "./pages/FacultyFeedback";
 import PlagiarismReport from "./pages/PlagiarismReport";
 import StudentCourses from "./pages/StudentCourses";
 
 import ProfessorDashboard from "./pages/ProfessorDashboard";
 import ReviewSubmissions from "./pages/ReviewSubmissions";
+import FacultyReview from "./pages/FacultyReview";
 import ReportReview from "./pages/ReportReview";
 import Courses from "./pages/Courses";
 
@@ -115,6 +117,7 @@ export default function App() {
           <Route path="/student/evidence-coverage" element={<ProtectedRoute allowedRoles={["student"]}><EvidenceCoverage /></ProtectedRoute>} />
           <Route path="/student/revision-comparison" element={<ProtectedRoute allowedRoles={["student"]}><RevisionComparison /></ProtectedRoute>} />
           <Route path="/student/submission-readiness" element={<ProtectedRoute allowedRoles={["student"]}><SubmissionReadiness /></ProtectedRoute>} />
+          <Route path="/student/faculty-feedback" element={<ProtectedRoute allowedRoles={["student"]}><FacultyFeedback /></ProtectedRoute>} />
           <Route path="/student/submissions" element={<ProtectedRoute allowedRoles={["student"]}><MySubmissions /></ProtectedRoute>} />
           <Route path="/student/reports" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
           <Route path="/student/reports/:id" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
@@ -124,6 +127,8 @@ export default function App() {
           {/* Professor routes (protected) */}
           <Route path="/professor/dashboard" element={<ProtectedRoute allowedRoles={["professor"]}><ProfessorDashboard /></ProtectedRoute>} />
           <Route path="/professor/submissions" element={<ProtectedRoute allowedRoles={["professor"]}><ReviewSubmissions /></ProtectedRoute>} />
+          <Route path="/professor/review/:projectId" element={<ProtectedRoute allowedRoles={["professor"]}><FacultyReview /></ProtectedRoute>} />
+          <Route path="/faculty/review/:projectId" element={<ProtectedRoute allowedRoles={["professor"]}><FacultyReview /></ProtectedRoute>} />
           <Route path="/professor/reports" element={<ProtectedRoute allowedRoles={["professor"]}><ReportReview /></ProtectedRoute>} />
           <Route path="/professor/reports/:id" element={<ProtectedRoute allowedRoles={["professor"]}><ReportReview /></ProtectedRoute>} />
           <Route path="/professor/courses" element={<ProtectedRoute allowedRoles={["professor"]}><Courses /></ProtectedRoute>} />

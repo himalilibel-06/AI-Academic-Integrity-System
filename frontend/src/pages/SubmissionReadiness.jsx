@@ -289,6 +289,9 @@ export default function SubmissionReadiness() {
             <Link to="/student/revision-comparison" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
               Revision
             </Link>
+            <Link to="/student/faculty-feedback" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
+              Faculty Feedback
+            </Link>
             <div className="h-4 w-px bg-slate-800 mx-1" />
             <span className="text-xs text-slate-300 font-medium px-2 py-1 bg-slate-800/80 rounded-md">
               {user?.full_name || user?.email || "Student"}

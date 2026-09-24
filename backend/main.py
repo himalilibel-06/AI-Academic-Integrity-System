@@ -19,6 +19,7 @@ from routes.reasoning import router as reasoning_router
 from routes.evidence_coverage import router as evidence_coverage_router
 from routes.revision_comparison import router as revision_comparison_router
 from routes.submission_readiness import router as submission_readiness_router
+from routes.faculty_review import router as faculty_review_router
 
 
 app = FastAPI(
@@ -68,6 +69,7 @@ app.include_router(reasoning_router)
 app.include_router(evidence_coverage_router)
 app.include_router(revision_comparison_router)
 app.include_router(submission_readiness_router)
+app.include_router(faculty_review_router)
 
 
 @app.get("/")

@@ -164,6 +164,7 @@ const NAV_ITEMS = [
   { label: "Evidence Coverage", icon: icons.evidenceReports, to: "/student/evidence-coverage", implemented: true },
   { label: "Revision Comparison", icon: icons.revisionHistory, to: "/student/revision-comparison", implemented: true },
   { label: "Submission Readiness", icon: icons.check, to: "/student/submission-readiness", implemented: true },
+  { label: "Faculty Feedback", icon: icons.check, to: "/student/faculty-feedback", implemented: true },
   { label: "Profile", icon: icons.profile, to: "/student/profile", implemented: true },
   { label: "Settings", icon: icons.settings, to: "/student/settings", implemented: true },
 ];
