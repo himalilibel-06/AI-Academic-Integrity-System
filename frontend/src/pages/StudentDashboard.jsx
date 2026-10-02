@@ -981,6 +981,15 @@ export default function StudentDashboard() {
                           View Dossier
                         </button>
 
+                        {/* Revision History Link */}
+                        <Link
+                          to={`/student/revision-history/${project.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                        >
+                          {icons.revisionHistory({ className: "h-3.5 w-3.5 text-indigo-500" })}
+                          Revision History
+                        </Link>
+
                         {/* Upload Manuscript Button (with projectId preselected) */}
                         <Link
                           to={`/student/upload?projectId=${project.id}`}

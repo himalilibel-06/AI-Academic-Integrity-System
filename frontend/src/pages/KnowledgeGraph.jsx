@@ -771,8 +771,7 @@ export default function KnowledgeGraph() {
               <span className="font-semibold text-blue-950">Educational Search &amp; Corpus Grounding Notice:</span>
               <p className="leading-relaxed">
                 This workbench serves both as an explainable research navigation tool and as an educational demonstration of AI syllabus
-                search algorithms (Breadth-First Search, Depth-First Search, and Greedy Best-First Search). The graph is constructed
-                from your local project inputs and local literature corpus. It does <strong>not</strong> represent the complete global scientific literature.
+                search algorithms (Breadth-First Search, Depth-First Search, and Greedy Best-First Search). This analysis is based only on the literature currently available in the GapGuard corpus. It does not establish global literature coverage, scientific truth, or research novelty. Human academic review is required.
               </p>
             </div>
           </div>

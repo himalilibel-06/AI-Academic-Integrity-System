@@ -435,7 +435,7 @@ export default function LiteratureCorpus() {
               <span className="font-bold">Retrieval Scope Notice:</span> This system searches the local{" "}
               <strong>development_sample_corpus</strong> and ranks papers by textual similarity. Higher similarity
               indicates topical alignment. It does <strong>NOT</strong> validate, contradict, or judge scientific
-              claims.
+              claims. This retrieval is based only on the literature currently available in the GapGuard corpus. It does not establish global literature coverage, scientific truth, or research novelty. Human academic review is required.
             </div>
           </div>
 

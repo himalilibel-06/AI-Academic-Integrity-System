@@ -128,15 +128,15 @@ export default function Login() {
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-[#0F172A] text-slate-100 px-14 py-12 relative overflow-hidden">
         <div>
           <p className="text-sm font-medium tracking-wide text-emerald-400">
-            AI Academic Integrity
+            GapGuard AI
           </p>
           <h1 className="mt-4 font-serif text-4xl leading-tight text-white max-w-md">
-            Plagiarism Detection &amp; Academic Review System
+            Research Gap Validation &amp; Academic Integrity System
           </h1>
           <p className="mt-6 text-slate-300 max-w-sm leading-relaxed">
-            A review platform that helps institutions compare submitted
-            documents, surface textual similarity, and support fair,
-            evidence-based academic integrity decisions.
+            An explainable research platform that helps researchers and faculty
+            validate claimed research gaps, differentiate novel contributions against
+            literature, audit evidence coverage, and track revision cycles.
           </p>
         </div>
 
@@ -145,7 +145,7 @@ export default function Login() {
         </div>
 
         <p className="text-xs text-slate-400 max-w-sm">
-          Built for students, professors, and academic review committees.
+          Built for research students, faculty reviewers, and academic advisors.
         </p>
       </div>
 
@@ -155,10 +155,10 @@ export default function Login() {
           {/* Mobile-only brand header */}
           <div className="mb-8 lg:hidden">
             <p className="text-sm font-medium tracking-wide text-emerald-500">
-              AI Academic Integrity
+              GapGuard AI
             </p>
             <h1 className="mt-1 font-serif text-2xl text-slate-900">
-              Plagiarism Detection &amp; Academic Review System
+              Research Gap Validation &amp; Academic Integrity System
             </h1>
           </div>
 

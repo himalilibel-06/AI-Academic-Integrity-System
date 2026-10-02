@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getResearchProjects } from "../service/projectStorage";
 import { saveManuscript, getManuscriptsByProject, getNextVersionLabel } from "../service/manuscriptStorage";
-import { extractManuscriptText, extractResearchInfo } from "../service/api";
+import { extractManuscriptText, extractResearchInfo, registerManuscript } from "../service/api";
 
 const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt"];
 const ACCEPTED_TYPES = [
@@ -564,6 +564,23 @@ export default function UploadSubmission() {
       setUploadedRecord(newRecord);
       setIsSuccess(true);
       setIsProcessing(false);
+
+      // Asynchronously register manuscript metadata on backend SQLite for cross-module parity
+      try {
+        const verDigits = (versionName || "").replace(/\D/g, "");
+        const versionNum = verDigits ? parseInt(verDigits, 10) : 1;
+        registerManuscript({
+          manuscript_id: newRecord.id,
+          project_id: selectedProjectId,
+          title: manuscriptTitle.trim(),
+          version_number: versionNum,
+          version_label: versionName.trim() || `Version ${versionNum}`,
+          file_name: selectedFile.name,
+          file_type: getFileTypeLabel(selectedFile.name),
+        }).catch((syncErr) => {
+          console.debug("Backend manuscript sync notice:", syncErr.message);
+        });
+      } catch (_) {}
     } catch (err) {
       console.error("Upload error:", err);
       setFileError(err.message || "Failed to register manuscript.");

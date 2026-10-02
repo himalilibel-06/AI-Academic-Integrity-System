@@ -141,6 +141,18 @@ export default function App() {
           <Route path="/professor/courses" element={<ProtectedRoute allowedRoles={["professor"]}><Courses /></ProtectedRoute>} />
           <Route path="/professor/profile" element={<ProtectedRoute allowedRoles={["professor"]}><Profile /></ProtectedRoute>} />
           <Route path="/professor/settings" element={<ProtectedRoute allowedRoles={["professor"]}><Settings /></ProtectedRoute>} />
+          {/* Friendly Aliases / Deep Links */}
+          <Route path="/research-projects" element={<Navigate to="/student/dashboard#projects" replace />} />
+          <Route path="/manuscripts" element={<Navigate to="/student/upload" replace />} />
+          <Route path="/literature" element={<Navigate to="/student/literature" replace />} />
+          <Route path="/gap-analysis" element={<Navigate to="/student/gap-analysis" replace />} />
+          <Route path="/contribution-analysis" element={<Navigate to="/student/contribution-analysis" replace />} />
+          <Route path="/knowledge-graph" element={<Navigate to="/student/knowledge-graph" replace />} />
+          <Route path="/reasoning" element={<Navigate to="/student/reasoning" replace />} />
+          <Route path="/evidence-coverage" element={<Navigate to="/student/evidence-coverage" replace />} />
+          <Route path="/revision-comparison" element={<Navigate to="/student/revision-comparison" replace />} />
+          <Route path="/submission-readiness" element={<Navigate to="/student/submission-readiness" replace />} />
+          <Route path="/faculty-review" element={<Navigate to="/faculty/reviews" replace />} />
 
           {/* Unknown routes */}
           <Route path="*" element={<NotFound />} />

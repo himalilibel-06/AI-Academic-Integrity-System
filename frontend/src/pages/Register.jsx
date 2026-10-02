@@ -125,35 +125,34 @@ export default function Register() {
               </svg>
             </div>
             <span className="text-sm tracking-wide text-slate-400">
-              Academic Integrity Platform
+              Research Integrity &amp; Review Platform
             </span>
           </div>
 
           <h1 className="text-3xl font-semibold leading-tight mb-3">
-            AI Academic Integrity
+            GapGuard AI
           </h1>
           <p className="text-lg text-slate-300 mb-6">
-            Plagiarism Detection &amp; Academic Review System
+            Research Gap Validation &amp; Academic Integrity System
           </p>
           <p className="text-slate-400 leading-relaxed">
-            A shared workspace for students and professors to submit,
-            track, and review academic work. Documents are compared for
-            similarity so professors can review submissions with
-            confidence and students can learn good citation practice.
+            An explainable research workspace for students, researchers, and faculty
+            to validate claimed research gaps, differentiate novel contributions against
+            literature evidence, audit claim support, and manage revision cycles.
           </p>
 
           <div className="mt-10 grid grid-cols-3 gap-4">
             <div className="border-t border-white/20 pt-3">
               <p className="text-sm text-slate-400">For students</p>
-              <p className="text-sm text-white mt-1">Submit &amp; track work</p>
+              <p className="text-sm text-white mt-1">Research &amp; Revisions</p>
             </div>
             <div className="border-t border-white/20 pt-3">
-              <p className="text-sm text-slate-400">For professors</p>
-              <p className="text-sm text-white mt-1">Review similarity</p>
+              <p className="text-sm text-slate-400">For faculty</p>
+              <p className="text-sm text-white mt-1">Review &amp; Feedback</p>
             </div>
             <div className="border-t border-white/20 pt-3">
               <p className="text-sm text-slate-400">Built on</p>
-              <p className="text-sm text-white mt-1">AI &amp; NLP methods</p>
+              <p className="text-sm text-white mt-1">Explainable AI &amp; Reasoning</p>
             </div>
           </div>
         </div>

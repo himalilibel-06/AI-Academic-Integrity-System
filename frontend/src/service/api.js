@@ -712,6 +712,23 @@ export async function createReviewCycle(cycleData) {
   });
 }
 
+/**
+ * Register manuscript metadata on the backend database.
+ */
+export async function registerManuscript(manuscriptData) {
+  return apiRequest("/api/faculty-review/manuscripts/register", {
+    method: "POST",
+    body: JSON.stringify(manuscriptData),
+  });
+}
+
+/**
+ * Retrieve all registered manuscripts for a research project from the backend.
+ */
+export async function getProjectManuscripts(projectId) {
+  return apiRequest(`/api/faculty-review/manuscripts/${encodeURIComponent(projectId)}`);
+}
+
 
 
 

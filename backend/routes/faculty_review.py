@@ -74,7 +74,8 @@ class RecordCycleRequest(BaseModel):
 
 
 class RegisterManuscriptRequest(BaseModel):
-    id: str = Field(..., description="Unique manuscript ID")
+    id: Optional[str] = Field(None, description="Unique manuscript ID")
+    manuscript_id: Optional[str] = Field(None, description="Alternative key for manuscript ID")
     project_id: str = Field(..., description="Associated research project ID")
     title: str = Field(..., description="Manuscript title")
     version_number: Optional[int] = Field(1, description="Version number")
@@ -203,7 +204,10 @@ async def register_research_manuscript(request: RegisterManuscriptRequest):
     Register a manuscript version for a research project.
     """
     try:
-        manu = faculty_review_service.register_manuscript(request.model_dump())
+        data = request.model_dump()
+        if not data.get("id") and data.get("manuscript_id"):
+            data["id"] = data["manuscript_id"]
+        manu = faculty_review_service.register_manuscript(data)
         return {
             "success": True,
             "manuscript": manu,
