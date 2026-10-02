@@ -76,7 +76,7 @@ export default function FacultyFeedback() {
       }
     } catch {
       // Default sample fallback
-      setProjects([{ id: "proj-01", title: "Medical Diagnostics" }]);
+      setProjects([{ id: "proj-01", title: "Agricultural Disease Detection" }]);
       setSelectedProjectId("proj-01");
     }
   }, [searchParams]);

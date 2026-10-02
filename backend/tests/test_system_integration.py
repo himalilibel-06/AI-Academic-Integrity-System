@@ -43,8 +43,8 @@ class TestSystemIntegrationSmokeSuite:
         conn.close()
 
         assert row is not None, "Seed project proj-01 must exist in the database."
-        assert "Contrastive Learning" in row["title"]
-        assert row["domain"] == "Healthcare AI & Bioinformatics"
+        assert "Agricultural Disease Detection" in row["title"]
+        assert row["domain"] == "Computer Vision & Agriculture AI"
 
     def test_b_manuscript_can_be_associated_with_project(self):
         """B. Manuscript can be registered and associated with a project."""
@@ -99,7 +99,7 @@ class TestSystemIntegrationSmokeSuite:
 
         search_res = client.post(
             "/api/literature/search",
-            json={"query": "contrastive vision language", "top_k": 5},
+            json={"query": "vision transformer edge plant pathology", "top_k": 5},
         )
         assert search_res.status_code == 200
         search_data = search_res.json()
@@ -109,10 +109,10 @@ class TestSystemIntegrationSmokeSuite:
     def test_e_gap_analysis_remains_available(self):
         """E. Gap contradiction analysis functions deterministically."""
         research_info = {
-            "title": "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
-            "claimed_research_gap": "Existing clinical multimodal architectures lack ontology-aligned token grounding under label noise.",
-            "research_problem": "Clinical vision-language models lack verifiable patch-level explainability in diagnostic reasoning.",
-            "proposed_method": "A contrastive attention alignment framework linking visual feature maps to RadLex terms.",
+            "title": "Robust Deep Feature Attribution in Agricultural Disease Detection",
+            "claimed_research_gap": "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.",
+            "research_problem": "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.",
+            "proposed_method": "Cross-attention attribution pooling with contrastive token alignment on edge hardware.",
         }
         res = client.post("/api/gap-analysis/analyze", json={"research_information": research_info, "top_k": 3})
         assert res.status_code == 200
@@ -132,10 +132,10 @@ class TestSystemIntegrationSmokeSuite:
     def test_f_contribution_analysis_remains_available(self):
         """F. Contribution differentiation analysis functions across all 6 dimensions."""
         research_info = {
-            "title": "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
-            "expected_contribution": "An open benchmark evaluating grounding faithfulness across 10 common thoracic pathologies.",
-            "proposed_method": "A contrastive attention alignment framework linking visual feature maps to RadLex terms.",
-            "dataset_context": "MIMIC-CXR and CheXpert chest radiography benchmark datasets.",
+            "title": "Robust Deep Feature Attribution in Agricultural Disease Detection",
+            "expected_contribution": "A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.",
+            "proposed_method": "Cross-attention attribution pooling with contrastive token alignment on edge hardware.",
+            "dataset_context": "PlantVillage and InFieldCrop-50K foliar disease benchmark datasets under variable field illumination.",
         }
         res = client.post("/api/contribution-analysis/analyze", json={"research_information": research_info, "top_k": 3})
         assert res.status_code == 200
@@ -149,10 +149,10 @@ class TestSystemIntegrationSmokeSuite:
     def test_g_submission_readiness_remains_available(self):
         """G. Submission readiness aggregates analyses into non-scoring explainable report."""
         research_info = {
-            "title": "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
-            "claimed_research_gap": "Existing clinical multimodal architectures lack ontology-aligned token grounding.",
-            "expected_contribution": "An open benchmark evaluating grounding faithfulness across 10 common thoracic pathologies.",
-            "proposed_method": "A contrastive attention alignment framework.",
+            "title": "Robust Deep Feature Attribution in Agricultural Disease Detection",
+            "claimed_research_gap": "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.",
+            "expected_contribution": "A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.",
+            "proposed_method": "Cross-attention attribution pooling with contrastive token alignment on edge hardware.",
         }
         res = client.post(
             "/api/submission-readiness/analyze",
@@ -230,16 +230,16 @@ class TestSystemIntegrationSmokeSuite:
     def test_k_revision_comparison_remains_available(self):
         """K. Revision comparison module evaluates differences between manuscript versions."""
         v1_info = {
-            "title": "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
-            "claimed_research_gap": "Lacks ontology alignment.",
-            "major_claims": ["Attribution alignment improves interpretability by 24%."],
+            "title": "Robust Deep Feature Attribution in Agricultural Disease Detection",
+            "claimed_research_gap": "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.",
+            "major_claims": ["Attribution alignment improves lesion localization interpretability without sacrificing predictive accuracy."],
         }
         v2_info = {
-            "title": "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics (Revised)",
-            "claimed_research_gap": "Lacks ontology alignment under severe class imbalance.",
+            "title": "Robust Deep Feature Attribution in Agricultural Disease Detection (Revised)",
+            "claimed_research_gap": "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination while maintaining edge inference budgets.",
             "major_claims": [
-                "Attribution alignment improves interpretability by 28%.",
-                "Focal contrastive alignment improves minority condition detection.",
+                "Attribution alignment improves diagnostic interpretability by 24% without degrading predictive accuracy.",
+                "Post-training token quantization reduces parameter footprint by 45% on mobile edge accelerators.",
             ],
         }
         res = client.post(
@@ -267,8 +267,8 @@ class TestSystemIntegrationSmokeSuite:
                 "project_id": "proj-01",
                 "manuscript_id": "manu-01",
                 "research_information": {
-                    "title": "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
-                    "claimed_research_gap": "Lacks localized grounding.",
+                    "title": "Robust Deep Feature Attribution in Agricultural Disease Detection",
+                    "claimed_research_gap": "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution.",
                 },
                 "top_k": 3,
             },

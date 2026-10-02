@@ -27,24 +27,24 @@ export const DOMAIN_OPTIONS = [
 export const INITIAL_RESEARCH_PROJECTS = [
   {
     id: "proj-01",
-    title: "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
-    domain: "Healthcare AI & Bioinformatics",
+    title: "Robust Deep Feature Attribution in Agricultural Disease Detection",
+    domain: "Computer Vision",
     researchProblem:
-      "Current clinical vision-language models produce opaque attribution maps, preventing radiologists from verifying if diagnoses stem from true pathology or spurious background artifacts.",
+      "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.",
     researchObjective:
-      "Develop an explainable cross-modal contrastive framework that aligns localized visual attention tokens directly with structured diagnostic ontology terms.",
+      "Develop edge-compatible Vision Transformer attribution alignment under severe illumination drift.",
     researchQuestion:
-      "Can attention-aligned latent projection resolve clinical feature attribution opacity without sacrificing diagnostic sensitivity?",
+      "Can attention-aligned token pooling improve spatial attribution fidelity and reduce false positives under severe field illumination drift without inflating edge inference latency?",
     claimedGap:
-      "Existing contrastive pretraining methods align global representation vectors without localized grounding, failing to guarantee token-level clinical interpretability across divergent radiographic modalities.",
+      "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.",
     proposedMethod:
-      "We introduce a dual-encoder architecture with a localized cross-attention attribution layer that projects patch-level image tokens onto concept-specific medical ontologies (RadLex/UMLS), supervised via a contrastive alignment loss.",
+      "Cross-attention attribution pooling with contrastive token alignment on edge hardware.",
     datasetContext:
-      "MIMIC-CXR and CheXpert datasets containing 377,000+ chest radiographs paired with free-text radiological reports.",
+      "PlantVillage and InFieldCrop-50K foliar disease benchmark datasets under variable field illumination.",
     expectedContribution:
-      "A novel ontology-grounded cross-modal contrastive learning formulation providing pixel-level explainable attribution bounds with provable clinical alignment.",
+      "A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.",
     evaluationMetrics:
-      "Intersection-over-Union (IoU) with radiologist-annotated bounding boxes, Pointing Game accuracy, and AUROC across 14 thoracic pathologies.",
+      "Attribution Intersection-over-Union (IoU), Top-1 Accuracy, Inference Latency (ms), Parameter Count.",
     createdAt: "2026-09-20T10:15:00.000Z",
     updatedAt: "2026-09-23T14:20:00.000Z",
     status: "Draft",

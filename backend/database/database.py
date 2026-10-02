@@ -214,13 +214,13 @@ def initialize_database():
         default_projects = [
             (
                 "proj-01",
-                "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
-                "Healthcare AI & Bioinformatics",
-                "Current clinical vision-language models produce opaque attribution maps, preventing radiologists from verifying if diagnoses stem from true pathology or spurious background artifacts.",
-                "Develop an explainable cross-modal contrastive framework that aligns localized visual attention tokens directly with structured diagnostic ontology terms.",
-                "Existing contrastive pretraining methods align global representation vectors without localized grounding, failing to guarantee token-level clinical interpretability across divergent radiographic modalities.",
-                "We introduce a dual-encoder architecture with a localized cross-attention attribution layer that projects patch-level image tokens onto concept-specific medical ontologies (RadLex/UMLS), supervised via a contrastive alignment loss.",
-                "A novel ontology-grounded cross-modal contrastive learning formulation providing pixel-level explainable attribution bounds with provable clinical alignment.",
+                "Robust Deep Feature Attribution in Agricultural Disease Detection",
+                "Computer Vision & Agriculture AI",
+                "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.",
+                "Develop edge-compatible Vision Transformer attribution alignment under severe illumination drift.",
+                "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.",
+                "Cross-attention attribution pooling with contrastive token alignment on edge hardware.",
+                "A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.",
             ),
             (
                 "proj-02",
@@ -270,19 +270,19 @@ def initialize_database():
             (
                 "manu-01",
                 "proj-01",
-                "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics",
+                "Robust Deep Feature Attribution in Agricultural Disease Detection",
                 1,
                 "Version 1 — Initial Draft",
-                "contrastive_medical_diagnostics_v1.pdf",
+                "feature_attribution_crop_disease_v1.pdf",
                 "PDF",
             ),
             (
                 "manu-02",
                 "proj-01",
-                "Explainable Contrastive Learning for Multi-Modal Medical Diagnostics (Revised)",
+                "Robust Deep Feature Attribution in Agricultural Disease Detection (Revised)",
                 2,
                 "Version 2 — Revised Draft",
-                "contrastive_medical_diagnostics_v2_revised.docx",
+                "feature_attribution_crop_disease_v2_revised.docx",
                 "DOCX",
             ),
             (
@@ -312,6 +312,45 @@ def initialize_database():
             """,
             default_manuscripts,
         )
+
+    # Phase 13 Coherent Demo Alignment Migration:
+    # Ensure proj-01 and associated records reflect the coherent agricultural vision demo scenario in existing databases
+    cursor.execute(
+        """
+        UPDATE research_projects
+        SET title = 'Robust Deep Feature Attribution in Agricultural Disease Detection',
+            domain = 'Computer Vision & Agriculture AI',
+            research_problem = 'Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.',
+            research_objective = 'Develop edge-compatible Vision Transformer attribution alignment under severe illumination drift.',
+            claimed_research_gap = 'Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.',
+            proposed_method = 'Cross-attention attribution pooling with contrastive token alignment on edge hardware.',
+            expected_contribution = 'A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.'
+        WHERE id = 'proj-01' AND (title LIKE '%Medical Diagnostics%' OR title LIKE '%Explainable Contrastive%')
+        """
+    )
+    cursor.execute(
+        """
+        UPDATE research_manuscripts
+        SET title = 'Robust Deep Feature Attribution in Agricultural Disease Detection',
+            file_name = 'feature_attribution_crop_disease_v1.pdf'
+        WHERE id = 'manu-01' AND title LIKE '%Medical Diagnostics%'
+        """
+    )
+    cursor.execute(
+        """
+        UPDATE research_manuscripts
+        SET title = 'Robust Deep Feature Attribution in Agricultural Disease Detection (Revised)',
+            file_name = 'feature_attribution_crop_disease_v2_revised.docx'
+        WHERE id = 'manu-02' AND title LIKE '%Medical Diagnostics%'
+        """
+    )
+    cursor.execute(
+        """
+        UPDATE faculty_reviews
+        SET project_title = 'Robust Deep Feature Attribution in Agricultural Disease Detection'
+        WHERE project_id = 'proj-01' AND project_title LIKE '%Medical Diagnostics%'
+        """
+    )
 
     # Useful Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_courses_professor ON courses(professor_id)")
