@@ -129,6 +129,11 @@ const icons = {
       <path d="M12 8h.01M12 12v4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  check: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}>
+      <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
   checkCircle: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" strokeLinejoin="round" />
@@ -174,6 +179,17 @@ const NAV_ITEMS = [
 --------------------------------------------------------- */
 function formatLastUpdated(dateStr) {
   if (!dateStr) return "Recently";
+  if (typeof dateStr !== "string") {
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+      }
+    } catch {
+      return "Recently";
+    }
+    return "Recently";
+  }
   if (dateStr.includes("ago") || dateStr.includes("Yesterday") || dateStr.includes("Today") || dateStr.includes("Just now")) {
     return dateStr;
   }
@@ -317,30 +333,32 @@ export default function StudentDashboard() {
 
   // Filter projects
   const filteredProjects = useMemo(() => {
-    if (!projectSearch.trim()) return projects;
+    const list = Array.isArray(projects) ? projects : [];
+    if (!projectSearch.trim()) return list;
     const q = projectSearch.toLowerCase();
-    return projects.filter(
+    return list.filter(
       (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.domain.toLowerCase().includes(q) ||
-        (p.status && p.status.toLowerCase().includes(q)) ||
-        (p.claimedGap && p.claimedGap.toLowerCase().includes(q))
+        p?.title?.toLowerCase().includes(q) ||
+        p?.domain?.toLowerCase().includes(q) ||
+        (p?.status && p.status.toLowerCase().includes(q)) ||
+        (p?.claimedGap && p.claimedGap.toLowerCase().includes(q))
     );
   }, [projects, projectSearch]);
 
   // Map recent manuscripts from registered manuscriptStorage
   const recentResearchActivity = useMemo(() => {
-    if (manuscripts.length > 0) {
-      return manuscripts.slice(0, 5).map((m) => ({
-        id: m.id,
+    const list = Array.isArray(manuscripts) ? manuscripts : [];
+    if (list.length > 0) {
+      return list.slice(0, 5).map((m) => ({
+        id: m?.id || "manu-default",
         reportId: null,
-        title: m.manuscriptTitle,
-        version: m.version,
-        domain: m.projectDomain || "Interdisciplinary AI",
-        date: formatLastUpdated(m.uploadedAt),
-        status: m.status || "Uploaded",
-        fileName: m.fileName,
-        fileSize: m.fileSize,
+        title: m?.manuscriptTitle || "Untitled Manuscript",
+        version: m?.version || "Version 1",
+        domain: m?.projectDomain || "Interdisciplinary AI",
+        date: formatLastUpdated(m?.uploadedAt),
+        status: m?.status || "Uploaded",
+        fileName: m?.fileName || "manuscript.pdf",
+        fileSize: m?.fileSize || "1.0 MB",
       }));
     }
 
@@ -363,7 +381,8 @@ export default function StudentDashboard() {
   // Manuscripts associated with the currently open dossier modal
   const dossierManuscripts = useMemo(() => {
     if (!selectedProjectDossier) return [];
-    return manuscripts.filter((m) => m.projectId === selectedProjectDossier.id);
+    const list = Array.isArray(manuscripts) ? manuscripts : [];
+    return list.filter((m) => m?.projectId === selectedProjectDossier.id);
   }, [selectedProjectDossier, manuscripts]);
 
   // Handle clicking on future Phase 2 nav items
@@ -468,7 +487,7 @@ export default function StudentDashboard() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    {item.icon({ className: `h-4.5 w-4.5 flex-shrink-0 ${isActive ? "text-white" : "text-slate-400"}` })}
+                    {typeof item.icon === "function" && item.icon({ className: `h-4.5 w-4.5 flex-shrink-0 ${isActive ? "text-white" : "text-slate-400"}` })}
                     <span>{item.label}</span>
                   </div>
                 </Link>
@@ -483,7 +502,7 @@ export default function StudentDashboard() {
                 className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-left group"
               >
                 <div className="flex items-center gap-3">
-                  {item.icon({ className: "h-4.5 w-4.5 flex-shrink-0 text-slate-400 group-hover:text-slate-200" })}
+                  {typeof item.icon === "function" && item.icon({ className: "h-4.5 w-4.5 flex-shrink-0 text-slate-400 group-hover:text-slate-200" })}
                   <span>{item.label}</span>
                 </div>
                 {item.tag && (

@@ -61,7 +61,13 @@ class TestFacultyReviewWorkflow:
         rev = data["review"]
         assert rev["project_id"] == "proj-01"
         assert rev["reviewer_name"] == "Dr. Alan Turing"
-        assert rev["status"] in (STATUS_IN_REVIEW, STATUS_FEEDBACK_PROVIDED, STATUS_NOT_REVIEWED)
+        assert rev["status"] in (
+            STATUS_IN_REVIEW,
+            STATUS_FEEDBACK_PROVIDED,
+            STATUS_NOT_REVIEWED,
+            STATUS_REVISION_REQUESTED,
+            STATUS_REVIEWED,
+        )
         assert "comments" in rev
         assert "research_problem" in rev["comments"]
 

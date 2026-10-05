@@ -37,7 +37,7 @@ class ResearchInformationInput(BaseModel):
     proposed_method: Optional[str] = None
     dataset_context: Optional[str] = None
     expected_contribution: Optional[str] = None
-    evaluation_metrics: Optional[str] = None
+    evaluation_metrics: Optional[Any] = None
     keywords: Optional[List[str]] = None
 
 
