@@ -142,6 +142,7 @@ export default function App() {
           <Route path="/professor/profile" element={<ProtectedRoute allowedRoles={["professor"]}><Profile /></ProtectedRoute>} />
           <Route path="/professor/settings" element={<ProtectedRoute allowedRoles={["professor"]}><Settings /></ProtectedRoute>} />
           {/* Friendly Aliases / Deep Links */}
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["student", "professor"]}><Navigate to="/student/dashboard" replace /></ProtectedRoute>} />
           <Route path="/research-projects" element={<Navigate to="/student/dashboard#projects" replace />} />
           <Route path="/manuscripts" element={<Navigate to="/student/upload" replace />} />
           <Route path="/literature" element={<Navigate to="/student/literature" replace />} />
