@@ -133,7 +133,7 @@ def register_user(data: RegisterRequest):
         if existing_user:
             raise HTTPException(
                 status_code=400,
-                detail="Email already registered"
+                detail="An account with this email already exists."
             )
 
         # Create user

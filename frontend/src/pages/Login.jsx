@@ -106,14 +106,11 @@ export default function Login() {
       try {
         const loggedInUser = await login(email.trim(), password);
         setSuccessMessage("Login successful! Redirecting...");
-
-        setTimeout(() => {
-          if (loggedInUser.role === "professor") {
-            navigate("/professor/dashboard");
-          } else {
-            navigate("/student/dashboard");
-          }
-        }, 500);
+        const target =
+          loggedInUser.role === "professor"
+            ? "/professor/dashboard"
+            : "/student/dashboard";
+        navigate(target, { replace: true });
       } catch (err) {
         setApiError(err.message || "Invalid email or password");
       } finally {
@@ -195,7 +192,7 @@ export default function Login() {
               </div>
             </fieldset>
 
-            <form className="mt-6 space-y-5" onSubmit={handleSubmit} noValidate>
+            <form className="mt-6 space-y-5" onSubmit={handleSubmit} noValidate autoComplete="on">
               {/* Email */}
               <div>
                 <label
@@ -207,6 +204,7 @@ export default function Login() {
                 <input
                   id="email"
                   type="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@university.edu"
@@ -245,6 +243,7 @@ export default function Login() {
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
@@ -309,7 +308,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-50"
+                className="w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "Signing in..." : `Sign in as ${role === "student" ? "Student" : "Professor"}`}
               </button>

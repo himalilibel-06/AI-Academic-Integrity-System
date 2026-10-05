@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -21,6 +21,21 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Guarantee all fields are completely blank upon page load / mount
+  useEffect(() => {
+    setFormData({
+      fullName: "",
+      email: "",
+      role: "",
+      password: "",
+      confirmPassword: "",
+      agreeTerms: false,
+    });
+    setErrors({});
+    setApiError("");
+    setSuccessMessage("");
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -86,6 +101,14 @@ export default function Register() {
         });
 
         setSuccessMessage("Account created successfully! Redirecting to login...");
+        setFormData({
+          fullName: "",
+          email: "",
+          role: "",
+          password: "",
+          confirmPassword: "",
+          agreeTerms: false,
+        });
         setTimeout(() => {
           navigate("/login");
         }, 1500);
@@ -188,7 +211,7 @@ export default function Register() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} noValidate className="space-y-5">
+            <form onSubmit={handleSubmit} noValidate className="space-y-5" autoComplete="off">
               <div>
                 <label
                   htmlFor="fullName"
@@ -200,6 +223,7 @@ export default function Register() {
                   id="fullName"
                   name="fullName"
                   type="text"
+                  autoComplete="off"
                   value={formData.fullName}
                   onChange={handleChange}
                   placeholder="Enter your full name"
@@ -229,6 +253,7 @@ export default function Register() {
                   id="email"
                   name="email"
                   type="email"
+                  autoComplete="off"
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="Enter your email"
@@ -286,6 +311,7 @@ export default function Register() {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Create a password"
@@ -362,6 +388,7 @@ export default function Register() {
                     id="confirmPassword"
                     name="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="Confirm your password"
@@ -462,9 +489,10 @@ export default function Register() {
 
               <button
                 type="submit"
-                className="w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                disabled={isSubmitting}
+                className="w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Account
+                {isSubmitting ? "Creating account..." : "Create Account"}
               </button>
             </form>
 

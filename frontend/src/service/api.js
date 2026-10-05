@@ -19,15 +19,35 @@ export async function apiRequest(endpoint, options = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (networkErr) {
+    console.error(`Network error connecting to API (${endpoint}):`, networkErr);
+    throw new Error("Unable to connect to the server. Please make sure the backend is running.");
+  }
 
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const errorMessage = data.detail || data.message || "An unexpected error occurred.";
+    let errorMessage = data.detail || data.message || "An unexpected error occurred.";
+    if (typeof errorMessage === "object" && errorMessage !== null) {
+      if (Array.isArray(errorMessage)) {
+        errorMessage = errorMessage.map((e) => e.msg || JSON.stringify(e)).join(", ");
+      } else {
+        errorMessage = JSON.stringify(errorMessage);
+      }
+    }
+    if (
+      typeof errorMessage === "string" &&
+      (errorMessage.toLowerCase().includes("email already registered") ||
+        errorMessage.toLowerCase().includes("already exists"))
+    ) {
+      errorMessage = "An account with this email already exists.";
+    }
     throw new Error(errorMessage);
   }
 

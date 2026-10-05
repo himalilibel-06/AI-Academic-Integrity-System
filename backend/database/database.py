@@ -352,6 +352,32 @@ def initialize_database():
         """
     )
 
+    # Phase 14 Demo Credentials Seeding:
+    # Ensure DEMO_CHECKLIST.md accounts (student@example.com & professor@example.com) exist
+    cursor.execute("SELECT id FROM users WHERE email = 'student@example.com'")
+    if not cursor.fetchone():
+        from werkzeug.security import generate_password_hash
+        student_pwd = generate_password_hash("password123")
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO users (name, email, password_hash, role)
+            VALUES (?, ?, ?, ?)
+            """,
+            ("Demo Student", "student@example.com", student_pwd, "student"),
+        )
+
+    cursor.execute("SELECT id FROM users WHERE email = 'professor@example.com'")
+    if not cursor.fetchone():
+        from werkzeug.security import generate_password_hash
+        prof_pwd = generate_password_hash("password123")
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO users (name, email, password_hash, role)
+            VALUES (?, ?, ?, ?)
+            """,
+            ("Dr. Demo Professor", "professor@example.com", prof_pwd, "professor"),
+        )
+
     # Useful Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_courses_professor ON courses(professor_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_enrollments_student ON course_enrollments(student_id)")
