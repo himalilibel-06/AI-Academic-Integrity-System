@@ -328,6 +328,12 @@ export default function StudentDashboard() {
   // Handle Start Analysis modal action
   const handleStartAnalysis = (e) => {
     e.preventDefault();
+    if (projects.length === 0) {
+      setActionSuccessNotice("Please create a research project first before running analysis.");
+      setStartAnalysisModalOpen(false);
+      setTimeout(() => setActionSuccessNotice(""), 6000);
+      return;
+    }
     setAnalysisTriggered(true);
     setTimeout(() => {
       setAnalysisTriggered(false);
@@ -370,20 +376,7 @@ export default function StudentDashboard() {
       }));
     }
 
-    // Default sample manuscripts if none exist
-    return [
-      {
-        id: "manu-01",
-        reportId: null,
-        title: "Disentangling Representational Shortcuts in Vision-Language Pretraining",
-        version: "Version 1 — Initial Draft",
-        domain: "Computer Vision & Healthcare AI",
-        date: "Today, 11:45 AM",
-        status: "Uploaded",
-        fileName: "vision_lang_pretraining.pdf",
-        fileSize: "2.4 MB",
-      },
-    ];
+    return [];
   }, [manuscripts]);
 
   // Manuscripts associated with the currently open dossier modal
@@ -1270,15 +1263,19 @@ export default function StudentDashboard() {
                   Target Research Project
                 </label>
                 <select
-                  value={selectedAnalysisProject || projects[0]?.title}
+                  value={selectedAnalysisProject || projects[0]?.title || ""}
                   onChange={(e) => setSelectedAnalysisProject(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white"
                 >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.title}>
-                      {p.title} ({p.domain})
-                    </option>
-                  ))}
+                  {projects.length === 0 ? (
+                    <option value="">No projects available (Create a project first)</option>
+                  ) : (
+                    projects.map((p) => (
+                      <option key={p.id} value={p.title}>
+                        {p.title} ({p.domain})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 

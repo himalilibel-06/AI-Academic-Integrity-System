@@ -11,127 +11,36 @@ import { getResearchProjects, saveResearchProject } from "./projectStorage";
 
 const STORAGE_KEY = "gapguard_manuscripts";
 
-export const INITIAL_MANUSCRIPTS = [
-  {
-    id: "manu-01",
-    projectId: "proj-01",
-    manuscriptTitle: "Robust Deep Feature Attribution in Agricultural Disease Detection",
-    version: "Version 1 — Initial Draft",
-    abstract:
-      "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions. We introduce cross-attention attribution pooling for foliar disease identification on edge hardware.",
-    keywords: "Vision Transformers, Feature Attribution, Plant Pathology, Edge AI, Model Interpretability",
-    fileName: "feature_attribution_crop_disease_v1.pdf",
-    fileType: "PDF",
-    fileSize: "2.4 MB",
-    fileReference: "local_blob://feature_attribution_crop_disease_v1.pdf",
-    uploadedAt: "2026-09-21T11:30:00.000Z",
-    status: "Uploaded",
-    researchInfo: {
-      title: "Robust Deep Feature Attribution in Agricultural Disease Detection",
-      abstract: "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions. We introduce cross-attention attribution pooling for foliar disease identification on edge hardware.",
-      keywords: ["Vision Transformers", "Feature Attribution", "Plant Pathology", "Edge AI"],
-      research_problem: "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.",
-      research_objective: "Develop edge-compatible Vision Transformer attribution alignment under severe illumination drift.",
-      research_question: "Can attention-aligned token pooling improve spatial attribution fidelity and reduce false positives under severe field illumination drift?",
-      claimed_research_gap: "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.",
-      proposed_method: "Cross-attention attribution pooling with contrastive token alignment on edge hardware.",
-      dataset_context: "PlantVillage benchmark dataset evaluated under simulated illumination variations.",
-      expected_contribution: "A hierarchical token attribution alignment method achieving calibrated pixel attribution maps on edge hardware.",
-      evaluation_metrics: ["accuracy", "iou", "latency_ms"],
-      major_claims: [
-        "Attribution alignment improves lesion localization interpretability without sacrificing predictive accuracy.",
-        "Cross-attention pooling suppresses spurious background soil and leaf specular reflections.",
-        "Standard Grad-CAM baselines produce diffuse attribution masks under intense direct sunlight."
-      ],
-      references: ["Vaswani et al., 2017", "Dosovitskiy et al., 2020", "Selvaraju et al., 2017"]
-    },
-  },
-  {
-    id: "manu-02",
-    projectId: "proj-01",
-    manuscriptTitle: "Robust Deep Feature Attribution in Agricultural Disease Detection (Revised)",
-    version: "Version 2 — Revised Draft",
-    abstract:
-      "Revised draft incorporating 8-bit post-training quantization, Edge TPU latency validation, and cross-dataset testing on the InFieldCrop-50K benchmark under outdoor illumination shifts.",
-    keywords: "Vision Transformers, Feature Attribution, Plant Pathology, Edge TPU, Model Quantization",
-    fileName: "feature_attribution_crop_disease_v2_revised.docx",
-    fileType: "DOCX",
-    fileSize: "3.1 MB",
-    fileReference: "local_blob://feature_attribution_crop_disease_v2_revised.docx",
-    uploadedAt: "2026-09-23T09:15:00.000Z",
-    status: "Uploaded",
-    researchInfo: {
-      title: "Robust Deep Feature Attribution in Agricultural Disease Detection (Revised)",
-      abstract: "Revised draft incorporating 8-bit post-training quantization, Edge TPU latency validation, and cross-dataset testing on the InFieldCrop-50K benchmark under outdoor illumination shifts.",
-      keywords: ["Vision Transformers", "Feature Attribution", "Plant Pathology", "Edge TPU", "Model Quantization"],
-      research_problem: "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.",
-      research_objective: "Develop edge-compatible Vision Transformer attribution alignment with hardware quantization under severe illumination drift.",
-      research_question: "Can attention-aligned token pooling combined with post-training quantization preserve spatial attribution fidelity on resource-constrained edge accelerators?",
-      claimed_research_gap: "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination while maintaining edge inference budgets.",
-      proposed_method: "Cross-attention attribution pooling with contrastive token alignment and 8-bit integer post-training quantization on edge TPU hardware.",
-      dataset_context: "PlantVillage and InFieldCrop-50K foliar disease benchmark datasets under variable field illumination.",
-      expected_contribution: "A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.",
-      evaluation_metrics: ["accuracy", "iou", "latency_ms", "parameter_count"],
-      major_claims: [
-        "Attribution alignment improves diagnostic interpretability by 24% without degrading predictive accuracy.",
-        "Post-training token quantization reduces parameter footprint by 45% on mobile edge accelerators.",
-        "Hierarchical token subsampling prevents attention collapse under severe field illumination variations."
-      ],
-      references: ["Vaswani et al., 2017", "Dosovitskiy et al., 2020", "Selvaraju et al., 2017", "Howard et al., 2019"]
-    },
-  },
-  {
-    id: "manu-03",
-    projectId: "proj-02",
-    manuscriptTitle: "Differential Privacy in Federated Knowledge Graph Embeddings",
-    version: "Version 1 — Initial Draft",
-    abstract:
-      "A topology-aware gradient perturbation mechanism for decentralized knowledge graph embedding under strict differential privacy budgets.",
-    keywords: "Differential Privacy, Federated Learning, Knowledge Graphs, Membership Inference",
-    fileName: "federated_kg_differential_privacy.pdf",
-    fileType: "PDF",
-    fileSize: "1.8 MB",
-    fileReference: "local_blob://federated_kg_differential_privacy.pdf",
-    uploadedAt: "2026-09-22T15:20:00.000Z",
-    status: "Uploaded",
-  },
-  {
-    id: "manu-04",
-    projectId: "proj-03",
-    manuscriptTitle: "Zero-Shot Cross-Lingual Semantic Parsing for Low-Resource Dialects",
-    version: "Version 1 — Pre-Print Draft",
-    abstract:
-      "Grammar-constrained variational autoencoders with dialect-invariant latent anchor tokens for zero-shot logical form execution.",
-    keywords: "Semantic Parsing, Cross-Lingual Transfer, Low-Resource NLP, Logical Forms",
-    fileName: "cross_lingual_semantic_parsing_draft.txt",
-    fileType: "TXT",
-    fileSize: "840 KB",
-    fileReference: "local_blob://cross_lingual_semantic_parsing_draft.txt",
-    uploadedAt: "2026-09-20T14:45:00.000Z",
-    status: "Uploaded",
-  },
-];
+export const INITIAL_MANUSCRIPTS = [];
+
+const FAKE_PROJECT_IDS = new Set(["proj-01", "proj-02", "proj-03"]);
 
 /**
  * Retrieve all registered manuscripts across all research projects.
+ * Filters out legacy demo manuscripts associated with removed fake projects.
  * Sorted by uploadedAt descending.
  */
 export function getManuscripts() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MANUSCRIPTS));
-      return INITIAL_MANUSCRIPTS;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MANUSCRIPTS));
-      return INITIAL_MANUSCRIPTS;
+    if (!Array.isArray(parsed)) {
+      return [];
     }
-    return parsed.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    // Filter out legacy fake manuscripts associated with removed fake projects
+    const userManuscripts = parsed.filter(
+      (m) => m && !FAKE_PROJECT_IDS.has(m.projectId) && !m.id?.startsWith("manu-0")
+    );
+    if (userManuscripts.length !== parsed.length) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(userManuscripts));
+    }
+    return userManuscripts.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
   } catch (err) {
     console.error("Error reading manuscripts from storage:", err);
-    return INITIAL_MANUSCRIPTS;
+    return [];
   }
 }
 
