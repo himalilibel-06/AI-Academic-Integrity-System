@@ -276,55 +276,7 @@ export default function SubmissionReadiness() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* ---------------- Navigation Header ---------------- */}
-      <header className="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <span className="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
-              <icons.clipboardCheck className="w-5 h-5" />
-            </span>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-base font-bold tracking-tight text-white">GapGuard AI</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded">
-                  Readiness
-                </span>
-              </div>
-              <span className="text-xs text-slate-400">Explainable Pre-Submission Review Dashboard</span>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Link to="/student/dashboard" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
-              Dashboard
-            </Link>
-            <Link to="/student/gap-analysis" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
-              Gap Analysis
-            </Link>
-            <Link to="/student/contribution-analysis" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
-              Contribution
-            </Link>
-            <Link to="/student/evidence-coverage" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
-              Evidence Coverage
-            </Link>
-            <Link to="/student/revision-comparison" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
-              Revision
-            </Link>
-            <Link to="/student/faculty-feedback" className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
-              Faculty Feedback
-            </Link>
-            <div className="h-4 w-px bg-slate-800 mx-1" />
-            <span className="text-xs text-slate-300 font-medium px-2 py-1 bg-slate-800/80 rounded-md">
-              {user?.full_name || user?.email || "Student"}
-            </span>
-            <button onClick={logout} className="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <div className="flex-1 min-w-0 flex flex-col bg-slate-950 text-slate-100 font-sans">
       {/* ---------------- Main Content ---------------- */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
         {/* Header & Project Selectors */}

@@ -30,6 +30,7 @@ import Courses from "./pages/Courses";
 
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import StudentLayout from "./components/StudentLayout";
 
 function NotFound() {
   return (
@@ -111,27 +112,36 @@ export default function App() {
           <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
           <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
 
-          {/* Student routes (protected) */}
-          <Route path="/student/dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboard /></ProtectedRoute>} />
-          <Route path="/student/projects/create" element={<ProtectedRoute allowedRoles={["student"]}><CreateResearchProject /></ProtectedRoute>} />
+          {/* Student routes (protected with shared StudentLayout) */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/student/dashboard" element={<StudentDashboard />} />
+            <Route path="/student/projects/create" element={<CreateResearchProject />} />
+            <Route path="/student/courses" element={<StudentCourses />} />
+            <Route path="/student/upload" element={<UploadSubmission />} />
+            <Route path="/student/literature" element={<LiteratureCorpus />} />
+            <Route path="/student/gap-analysis" element={<GapAnalysis />} />
+            <Route path="/student/contribution-analysis" element={<ContributionAnalysis />} />
+            <Route path="/student/knowledge-graph" element={<KnowledgeGraph />} />
+            <Route path="/student/reasoning" element={<ReasoningWorkbench />} />
+            <Route path="/student/evidence-coverage" element={<EvidenceCoverage />} />
+            <Route path="/student/revision-comparison" element={<RevisionComparison />} />
+            <Route path="/student/submission-readiness" element={<SubmissionReadiness />} />
+            <Route path="/student/faculty-feedback" element={<FacultyFeedback />} />
+            <Route path="/student/revision-history/:projectId" element={<FacultyReviewHistory />} />
+            <Route path="/student/submissions" element={<MySubmissions />} />
+            <Route path="/student/reports" element={<PlagiarismReport />} />
+            <Route path="/student/reports/:id" element={<PlagiarismReport />} />
+            <Route path="/student/profile" element={<Profile />} />
+            <Route path="/student/settings" element={<Settings />} />
+          </Route>
           <Route path="/student/projects" element={<Navigate to="/student/dashboard#projects" replace />} />
-          <Route path="/student/courses" element={<ProtectedRoute allowedRoles={["student"]}><StudentCourses /></ProtectedRoute>} />
-          <Route path="/student/upload" element={<ProtectedRoute allowedRoles={["student"]}><UploadSubmission /></ProtectedRoute>} />
-          <Route path="/student/literature" element={<ProtectedRoute allowedRoles={["student"]}><LiteratureCorpus /></ProtectedRoute>} />
-          <Route path="/student/gap-analysis" element={<ProtectedRoute allowedRoles={["student"]}><GapAnalysis /></ProtectedRoute>} />
-          <Route path="/student/contribution-analysis" element={<ProtectedRoute allowedRoles={["student"]}><ContributionAnalysis /></ProtectedRoute>} />
-          <Route path="/student/knowledge-graph" element={<ProtectedRoute allowedRoles={["student"]}><KnowledgeGraph /></ProtectedRoute>} />
-          <Route path="/student/reasoning" element={<ProtectedRoute allowedRoles={["student"]}><ReasoningWorkbench /></ProtectedRoute>} />
-          <Route path="/student/evidence-coverage" element={<ProtectedRoute allowedRoles={["student"]}><EvidenceCoverage /></ProtectedRoute>} />
-          <Route path="/student/revision-comparison" element={<ProtectedRoute allowedRoles={["student"]}><RevisionComparison /></ProtectedRoute>} />
-          <Route path="/student/submission-readiness" element={<ProtectedRoute allowedRoles={["student"]}><SubmissionReadiness /></ProtectedRoute>} />
-          <Route path="/student/faculty-feedback" element={<ProtectedRoute allowedRoles={["student"]}><FacultyFeedback /></ProtectedRoute>} />
-          <Route path="/student/revision-history/:projectId" element={<ProtectedRoute allowedRoles={["student"]}><FacultyReviewHistory /></ProtectedRoute>} />
-          <Route path="/student/submissions" element={<ProtectedRoute allowedRoles={["student"]}><MySubmissions /></ProtectedRoute>} />
-          <Route path="/student/reports" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
-          <Route path="/student/reports/:id" element={<ProtectedRoute allowedRoles={["student"]}><PlagiarismReport /></ProtectedRoute>} />
-          <Route path="/student/profile" element={<ProtectedRoute allowedRoles={["student"]}><Profile /></ProtectedRoute>} />
-          <Route path="/student/settings" element={<ProtectedRoute allowedRoles={["student"]}><Settings /></ProtectedRoute>} />
+          <Route path="/student/manuscripts" element={<Navigate to="/student/submissions" replace />} />
 
           {/* Professor routes (protected) */}
           <Route path="/professor/dashboard" element={<ProtectedRoute allowedRoles={["professor"]}><ProfessorDashboard /></ProtectedRoute>} />
@@ -147,10 +157,11 @@ export default function App() {
           <Route path="/professor/courses" element={<ProtectedRoute allowedRoles={["professor"]}><Courses /></ProtectedRoute>} />
           <Route path="/professor/profile" element={<ProtectedRoute allowedRoles={["professor"]}><Profile /></ProtectedRoute>} />
           <Route path="/professor/settings" element={<ProtectedRoute allowedRoles={["professor"]}><Settings /></ProtectedRoute>} />
+
           {/* Friendly Aliases / Deep Links */}
           <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["student", "professor"]}><DashboardRedirect /></ProtectedRoute>} />
           <Route path="/research-projects" element={<Navigate to="/student/dashboard#projects" replace />} />
-          <Route path="/manuscripts" element={<Navigate to="/student/upload" replace />} />
+          <Route path="/manuscripts" element={<Navigate to="/student/submissions" replace />} />
           <Route path="/literature" element={<Navigate to="/student/literature" replace />} />
           <Route path="/gap-analysis" element={<Navigate to="/student/gap-analysis" replace />} />
           <Route path="/contribution-analysis" element={<Navigate to="/student/contribution-analysis" replace />} />
@@ -159,6 +170,7 @@ export default function App() {
           <Route path="/evidence-coverage" element={<Navigate to="/student/evidence-coverage" replace />} />
           <Route path="/revision-comparison" element={<Navigate to="/student/revision-comparison" replace />} />
           <Route path="/submission-readiness" element={<Navigate to="/student/submission-readiness" replace />} />
+          <Route path="/faculty-feedback" element={<Navigate to="/student/faculty-feedback" replace />} />
           <Route path="/faculty-review" element={<Navigate to="/faculty/reviews" replace />} />
 
           {/* Unknown routes */}

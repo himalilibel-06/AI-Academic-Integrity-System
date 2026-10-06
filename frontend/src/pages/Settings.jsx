@@ -336,72 +336,15 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 lg:flex">
-      {/* Mobile top bar */}
-      <div className="lg:hidden flex items-center justify-between bg-slate-900 text-white px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5L3 8.25l9 3.75 9-3.75-9-3.75zM3 8.25v7.5l9 3.75m0-11.25l9 3.75m-9-3.75v11.25m9-11.25v7.5l-9 3.75"
-              />
-            </svg>
-          </div>
-          <span className="text-sm font-medium">Academic Integrity</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsSidebarOpen(true)}
-          className="p-2 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
-          aria-label="Open navigation menu"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"
-            />
-          </svg>
-        </button>
-      </div>
-
-      {/* Mobile backdrop */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:flex-shrink-0 lg:min-h-screen ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="px-6 py-6 border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
+    <div className={isProfessor ? "min-h-screen w-full bg-slate-50 lg:flex" : "flex-1 min-w-0 flex flex-col bg-slate-50 text-slate-900 font-sans"}>
+      {/* Mobile top bar for Professor */}
+      {isProfessor && (
+        <div className="lg:hidden flex items-center justify-between bg-slate-900 text-white px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-white"
+                className="h-4 w-4 text-white"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -414,20 +357,13 @@ export default function Settings() {
                 />
               </svg>
             </div>
-            <div>
-              <p className="text-sm font-medium leading-tight">
-                Academic Integrity
-              </p>
-              <p className="text-xs text-slate-400 leading-tight">
-                {isProfessor ? "Professor Portal" : "Student Portal"}
-              </p>
-            </div>
+            <span className="text-sm font-medium">Academic Integrity</span>
           </div>
           <button
             type="button"
-            onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
-            aria-label="Close navigation menu"
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
+            aria-label="Open navigation menu"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -440,45 +376,113 @@ export default function Settings() {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
+                d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"
               />
             </svg>
           </button>
         </div>
+      )}
 
-        <nav className="px-3 py-4" aria-label="Portal navigation">
-          <ul className="space-y-1">
-            {navItems.map((item) => {
-              const isActive = item.label === "Settings";
-              return (
-                <li key={item.label}>
-                  <Link
-                    to={item.to}
-                    className={`block rounded-lg px-3.5 py-2.5 text-sm transition ${
-                      isActive
-                        ? "bg-white/10 text-white font-medium border border-white/20"
-                        : "text-slate-300 hover:bg-white/5 hover:text-white"
-                    }`}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+      {/* Mobile backdrop for Professor */}
+      {isProfessor && isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-        <div className="px-3 py-4 mt-auto border-t border-white/10">
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full text-left rounded-lg px-3.5 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition"
-          >
-            Sign Out
-          </button>
-        </div>
-      </aside>
+      {/* Sidebar for Professor */}
+      {isProfessor && (
+        <aside
+          className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:flex-shrink-0 lg:min-h-screen ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="px-6 py-6 border-b border-white/10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4.5L3 8.25l9 3.75 9-3.75-9-3.75zM3 8.25v7.5l9 3.75m0-11.25l9 3.75m-9-3.75v11.25m9-11.25v7.5l-9 3.75"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium leading-tight">
+                  Academic Integrity
+                </p>
+                <p className="text-xs text-slate-400 leading-tight">
+                  {isProfessor ? "Professor Portal" : "Student Portal"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
+              aria-label="Close navigation menu"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <nav className="px-3 py-4" aria-label="Portal navigation">
+            <ul className="space-y-1">
+              {navItems.map((item) => {
+                const isActive = item.label === "Settings";
+                return (
+                  <li key={item.label}>
+                    <Link
+                      to={item.to}
+                      className={`block rounded-lg px-3.5 py-2.5 text-sm transition ${
+                        isActive
+                          ? "bg-white/10 text-white font-medium border border-white/20"
+                          : "text-slate-300 hover:bg-white/5 hover:text-white"
+                      }`}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <div className="px-3 py-4 mt-auto border-t border-white/10">
+            <button
+              type="button"
+              onClick={logout}
+              className="w-full text-left rounded-lg px-3.5 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition"
+            >
+              Sign Out
+            </button>
+          </div>
+        </aside>
+      )}
 
       {/* Main content */}
       <main className="flex-1 px-4 py-8 sm:px-8 lg:px-10">

@@ -300,72 +300,76 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="flex">
+    <div className={isProfessor ? "min-h-screen bg-slate-50" : "flex-1 min-w-0 flex flex-col bg-slate-50 text-slate-900 font-sans"}>
+      <div className={isProfessor ? "flex" : "flex-1 flex flex-col min-w-0"}>
         {/* Mobile top bar */}
-        <div className="fixed inset-x-0 top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
-          <span className="text-lg font-semibold text-slate-900">
-            Integrity<span className="text-emerald-600">Check</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen((open) => !open)}
-            aria-expanded={sidebarOpen}
-            aria-controls="profile-sidebar"
-            aria-label="Toggle navigation menu"
-            className="rounded-md border border-slate-200 p-2 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
+        {isProfessor && (
+          <div className="fixed inset-x-0 top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
+            <span className="text-lg font-semibold text-slate-900">
+              Integrity<span className="text-emerald-600">Check</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen((open) => !open)}
+              aria-expanded={sidebarOpen}
+              aria-controls="profile-sidebar"
+              aria-label="Toggle navigation menu"
+              className="rounded-md border border-slate-200 p-2 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Sidebar */}
-        <aside
-          id="profile-sidebar"
-          className={`fixed inset-y-0 left-0 z-20 w-64 transform border-r border-slate-800 bg-[#0F172A] transition-transform duration-200 lg:static lg:translate-x-0 ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } pt-16 lg:pt-0`}
-        >
-          <div className="flex h-full flex-col">
-            <div className="hidden border-b border-slate-800 px-6 py-5 lg:block">
-              <span className="text-lg font-semibold text-white">
-                Integrity<span className="text-emerald-400">Check</span>
-              </span>
+        {isProfessor && (
+          <aside
+            id="profile-sidebar"
+            className={`fixed inset-y-0 left-0 z-20 w-64 transform border-r border-slate-800 bg-[#0F172A] transition-transform duration-200 lg:static lg:translate-x-0 ${
+              sidebarOpen ? "translate-x-0" : "-translate-x-full"
+            } pt-16 lg:pt-0`}
+          >
+            <div className="flex h-full flex-col">
+              <div className="hidden border-b border-slate-800 px-6 py-5 lg:block">
+                <span className="text-lg font-semibold text-white">
+                  Integrity<span className="text-emerald-400">Check</span>
+                </span>
+              </div>
+              <nav className="flex-1 space-y-1 px-3 py-4">
+                {sidebarItems.map((item) => {
+                  const isActive = item.label === "Profile";
+                  return (
+                    <Link
+                      key={item.label}
+                      to={item.href}
+                      className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                        isActive
+                          ? "bg-emerald-500 text-white"
+                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      }`}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+              <div className="border-t border-slate-800 px-3 py-4">
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="w-full text-left rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
-            <nav className="flex-1 space-y-1 px-3 py-4">
-              {sidebarItems.map((item) => {
-                const isActive = item.label === "Profile";
-                return (
-                  <Link
-                    key={item.label}
-                    to={item.href}
-                    className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                      isActive
-                        ? "bg-emerald-500 text-white"
-                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                    }`}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="border-t border-slate-800 px-3 py-4">
-              <button
-                type="button"
-                onClick={logout}
-                className="w-full text-left rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
-        {sidebarOpen && (
+        {isProfessor && sidebarOpen && (
           <button
             type="button"
             aria-label="Close navigation menu"
@@ -375,7 +379,7 @@ export default function Profile() {
         )}
 
         {/* Main content */}
-        <main className="min-h-screen w-full flex-1 px-4 pb-12 pt-20 sm:px-6 lg:px-10 lg:pt-10">
+        <main className={`w-full flex-1 px-4 pb-12 ${isProfessor ? "min-h-screen pt-20 sm:px-6 lg:px-10 lg:pt-10" : "py-8 sm:px-8 lg:px-10"}`}>
           {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="mb-3 text-sm text-slate-500">
             <Link to={dashboardHref} className="hover:text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded">

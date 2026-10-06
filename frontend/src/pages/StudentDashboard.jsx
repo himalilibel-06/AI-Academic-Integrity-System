@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getStudentDashboard } from "../service/api";
 import { getResearchProjects, deleteResearchProject } from "../service/projectStorage";
@@ -238,11 +238,19 @@ export default function StudentDashboard() {
   const highlightedProjectId = searchParams.get("highlight");
 
   const { user, logout } = useAuth();
+  const location = useLocation();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Handle hash navigation to #projects or #research-projects-section
+  useEffect(() => {
+    if (location.hash === "#projects" || location.hash === "#research-projects-section") {
+      const el = document.getElementById("research-projects-section");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [location.hash]);
 
   // Research Projects state (backed by projectStorage)
   const [projects, setProjects] = useState(() => getResearchProjects());
@@ -401,144 +409,7 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900/5 text-slate-900 lg:flex font-sans">
-      {/* ---------------- Mobile Top Navigation ---------------- */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden shadow-xs">
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open navigation menu"
-          className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition"
-        >
-          {icons.menu({ className: "h-6 w-6" })}
-        </button>
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg bg-gradient-to-tr from-indigo-600 to-emerald-500 flex items-center justify-center text-white font-bold text-xs shadow-xs">
-            G
-          </div>
-          <span className="text-sm font-bold tracking-tight text-slate-900">GapGuard AI</span>
-        </div>
-        <div className="h-8 w-8 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center shadow-xs">
-          {researcherInfo.initials}
-        </div>
-      </div>
-
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs lg:hidden transition-opacity"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* ---------------- Sidebar ---------------- */}
-      <aside
-        className={`fixed z-50 inset-y-0 left-0 w-72 transform bg-[#0B1120] text-slate-200 px-5 py-6 flex flex-col transition-transform duration-200 lg:static lg:translate-x-0 lg:flex-shrink-0 border-r border-slate-800 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Brand identity header */}
-        <div className="flex items-center justify-between pb-5 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-emerald-400 p-0.5 shadow-md shadow-indigo-950/50">
-              <div className="w-full h-full bg-[#0B1120] rounded-[10px] flex items-center justify-center text-indigo-400">
-                {icons.sparkles({ className: "h-5 w-5" })}
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-base font-bold tracking-tight text-white">GapGuard</span>
-                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  AI
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 font-medium">Research Gap Intelligence</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close navigation menu"
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 lg:hidden"
-          >
-            {icons.close({ className: "h-5 w-5" })}
-          </button>
-        </div>
-
-        {/* Navigation list */}
-        <div className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-2">
-          Research Workflow
-        </div>
-        <nav className="mt-2 flex-1 space-y-1 overflow-y-auto pr-1">
-          {NAV_ITEMS.map((item) => {
-            const isActive = item.label === "Dashboard";
-
-            if (item.implemented && !item.isAnchor) {
-              return (
-                <Link
-                  key={item.label}
-                  to={item.to}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                    isActive
-                      ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-900/30 font-semibold"
-                      : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {typeof item.icon === "function" && item.icon({ className: `h-4.5 w-4.5 flex-shrink-0 ${isActive ? "text-white" : "text-slate-400"}` })}
-                    <span>{item.label}</span>
-                  </div>
-                </Link>
-              );
-            }
-
-            return (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => handleNavClick(item)}
-                className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-left group"
-              >
-                <div className="flex items-center gap-3">
-                  {typeof item.icon === "function" && item.icon({ className: "h-4.5 w-4.5 flex-shrink-0 text-slate-400 group-hover:text-slate-200" })}
-                  <span>{item.label}</span>
-                </div>
-                {item.tag && (
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 border border-indigo-500/20">
-                    {item.tag}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Sidebar Researcher Profile / Logout Footer */}
-        <div className="pt-4 border-t border-slate-800/80 mt-auto space-y-2">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/40 border border-slate-800">
-            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-600 to-emerald-500 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0 shadow-xs">
-              {researcherInfo.initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-white truncate">{researcherInfo.name}</p>
-              <p className="text-[11px] text-slate-400 truncate">{researcherInfo.email}</p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-slate-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
-          >
-            {icons.logout({ className: "h-4 w-4" })}
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* ---------------- Main Content Area ---------------- */}
+    <>
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Desktop Header */}
         <header className="hidden lg:flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4.5 shadow-xs sticky top-0 z-30">
@@ -1515,6 +1386,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

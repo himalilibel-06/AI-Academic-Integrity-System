@@ -242,73 +242,7 @@ export default function ReasoningWorkbench() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* ---------------- Navigation Bar ---------------- */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <icons.shield className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="font-bold text-lg text-white tracking-tight">GapGuard <span className="text-indigo-400">AI</span></span>
-              <span className="ml-2 text-xs uppercase px-2 py-0.5 rounded font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Phase 9 • Reasoning
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Link
-              to="/student/dashboard"
-              className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition"
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/student/gap-analysis"
-              className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition"
-            >
-              Gap Analysis
-            </Link>
-            <Link
-              to="/student/contribution-analysis"
-              className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition"
-            >
-              Contribution
-            </Link>
-            <Link
-              to="/student/knowledge-graph"
-              className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition"
-            >
-              Knowledge Graph
-            </Link>
-            <Link
-              to="/student/evidence-coverage"
-              className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition"
-            >
-              Evidence Coverage
-            </Link>
-            <Link
-              to="/student/revision-comparison"
-              className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition"
-            >
-              Revision Comparison
-            </Link>
-            <div className="h-4 w-px bg-slate-800 mx-1" />
-            <span className="text-xs text-slate-300 font-medium px-2 py-1 bg-slate-800/80 rounded-md">
-              {user?.full_name || user?.email || "Student"}
-            </span>
-            <button
-              onClick={logout}
-              className="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <div className="flex-1 min-w-0 flex flex-col bg-slate-950 text-slate-100 font-sans">
       {/* ---------------- Main Container ---------------- */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
         {/* Header & Project Selector */}
