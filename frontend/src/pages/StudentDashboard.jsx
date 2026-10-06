@@ -508,22 +508,6 @@ export default function StudentDashboard() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row gap-3 flex-shrink-0">
-                <Link
-                  to="/student/projects/create"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-950/40 transition hover:translate-y-[-1px]"
-                >
-                  {icons.plus({ className: "h-4 w-4" })}
-                  Create Research Project
-                </Link>
-                <Link
-                  to="/student/upload"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 px-4 py-3 text-sm font-semibold text-white border border-white/15 transition hover:translate-y-[-1px]"
-                >
-                  {icons.upload({ className: "h-4 w-4" })}
-                  Upload Manuscript
-                </Link>
-              </div>
             </div>
           </section>
 
@@ -533,45 +517,45 @@ export default function StudentDashboard() {
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Quick Actions</h3>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Quick Action 1: Create Research Project */}
+              {/* Quick Action 1: Literature Corpus */}
               <Link
-                to="/student/projects/create"
+                to="/student/literature"
                 className="group text-left rounded-2xl border border-slate-200 bg-white p-5 hover:border-indigo-500 hover:shadow-md transition-all shadow-xs block"
               >
                 <div className="flex items-start justify-between">
                   <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition">
-                    {icons.plus({ className: "h-5 w-5" })}
+                    {icons.literature({ className: "h-5 w-5" })}
                   </div>
                   <span className="text-xs font-semibold text-indigo-600 opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
-                    Start {icons.arrowRight({ className: "h-3.5 w-3.5" })}
+                    Explore {icons.arrowRight({ className: "h-3.5 w-3.5" })}
                   </span>
                 </div>
                 <h4 className="mt-3.5 text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition">
-                  Create Research Project
+                  Literature Corpus
                 </h4>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                  Establish a new research study with problem, gap, and contribution definitions.
+                  Search and index peer-reviewed literature across OpenAlex, arXiv, and Semantic Scholar.
                 </p>
               </Link>
 
-              {/* Quick Action 2: Upload Manuscript */}
+              {/* Quick Action 2: Gap Analysis */}
               <Link
-                to="/student/upload"
+                to="/student/gap-analysis"
                 className="group text-left rounded-2xl border border-slate-200 bg-white p-5 hover:border-emerald-500 hover:shadow-md transition-all shadow-xs block"
               >
                 <div className="flex items-start justify-between">
                   <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition">
-                    {icons.upload({ className: "h-5 w-5" })}
+                    {icons.gapAnalysis({ className: "h-5 w-5" })}
                   </div>
                   <span className="text-xs font-semibold text-emerald-600 opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
-                    Upload {icons.arrowRight({ className: "h-3.5 w-3.5" })}
+                    Validate {icons.arrowRight({ className: "h-3.5 w-3.5" })}
                   </span>
                 </div>
                 <h4 className="mt-3.5 text-sm font-bold text-slate-900 group-hover:text-emerald-600 transition">
-                  Upload Manuscript
+                  Gap Analysis
                 </h4>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                  Attach a draft manuscript (.pdf, .docx, .txt) to a research project.
+                  Validate research problem formulation and verify unaddressed scientific gaps.
                 </p>
               </Link>
 
