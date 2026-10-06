@@ -386,6 +386,101 @@ export default function StudentDashboard() {
     return list.filter((m) => m?.projectId === selectedProjectDossier.id);
   }, [selectedProjectDossier, manuscripts]);
 
+  // Dynamic metrics for the Analysis Overview section
+  const analysisOverview = useMemo(() => {
+    const list = Array.isArray(projects) ? projects : [];
+
+    // Find any real analysis metrics stored on user projects
+    const projectsWithGap = list.filter(
+      (p) => typeof p?.gapScore === "number" || typeof p?.gapValidationScore === "number" || typeof p?.gapValidation === "number"
+    );
+    const projectsWithPapers = list.filter(
+      (p) => typeof p?.papersSynthesized === "number" || typeof p?.papersCount === "number"
+    );
+    const projectsWithNovelty = list.filter((p) => typeof p?.noveltyIndex === "number");
+    const projectsWithCoverage = list.filter((p) => typeof p?.citationCoverage === "number");
+
+    const hasCompletedAnalyses = list.some(
+      (p) => p?.status === "Analysis Complete" || p?.status === "Gap Validated" || p?.status === "Literature Synthesized"
+    );
+
+    const hasAnyRealData =
+      projectsWithGap.length > 0 ||
+      projectsWithPapers.length > 0 ||
+      projectsWithNovelty.length > 0 ||
+      projectsWithCoverage.length > 0;
+
+    // 1. Gap Validation
+    let gapValidationValue = "0%";
+    let gapValidationLabel = "No analyses yet";
+    let isConfidence = false;
+    if (projectsWithGap.length > 0) {
+      const avg =
+        projectsWithGap.reduce(
+          (sum, p) => sum + (p.gapScore ?? p.gapValidationScore ?? p.gapValidation),
+          0
+        ) / projectsWithGap.length;
+      gapValidationValue = `${avg.toFixed(1)}%`;
+      gapValidationLabel = avg >= 70 ? "High Confidence" : avg >= 40 ? "Moderate Confidence" : "Low Confidence";
+      isConfidence = true;
+    } else if (hasCompletedAnalyses) {
+      gapValidationLabel = "Analysis Complete";
+    }
+
+    // 2. Literature Evidence
+    let literatureCount = 0;
+    if (projectsWithPapers.length > 0) {
+      literatureCount = projectsWithPapers.reduce(
+        (sum, p) => sum + (p.papersSynthesized ?? p.papersCount),
+        0
+      );
+    }
+
+    // 3. Contribution Differentiation
+    let noveltyValue = "0.00";
+    if (projectsWithNovelty.length > 0) {
+      const avg = projectsWithNovelty.reduce((sum, p) => sum + p.noveltyIndex, 0) / projectsWithNovelty.length;
+      noveltyValue = avg.toFixed(2);
+    }
+
+    // 4. Citation Coverage
+    let citationValue = "0%";
+    let citationLabel = projectsWithCoverage.length > 0 ? "Verified" : "Not Verified";
+    if (projectsWithCoverage.length > 0) {
+      const avg = projectsWithCoverage.reduce((sum, p) => sum + p.citationCoverage, 0) / projectsWithCoverage.length;
+      citationValue = `${avg.toFixed(1)}%`;
+    }
+
+    return {
+      hasRealData: hasAnyRealData || hasCompletedAnalyses,
+      gap: {
+        value: gapValidationValue,
+        label: gapValidationLabel,
+        isConfidence,
+        engine: hasAnyRealData || hasCompletedAnalyses ? "Graph-Reasoner" : "Not Started",
+        badge: hasAnyRealData || hasCompletedAnalyses ? "Active" : "No Data",
+      },
+      literature: {
+        value: literatureCount,
+        label: "Papers Synthesized",
+        source: hasAnyRealData || hasCompletedAnalyses ? "Semantic Scholar" : "Not Connected",
+        badge: hasAnyRealData || hasCompletedAnalyses ? "Active" : "No Data",
+      },
+      contribution: {
+        value: noveltyValue,
+        label: "Novelty Index",
+        variance: projectsWithNovelty.length > 0 ? "Evaluated" : "N/A",
+        badge: hasAnyRealData || hasCompletedAnalyses ? "Active" : "No Data",
+      },
+      citation: {
+        value: citationValue,
+        label: citationLabel,
+        graph: projectsWithCoverage.length > 0 ? "Active" : "Inactive",
+        badge: hasAnyRealData || hasCompletedAnalyses ? "Active" : "No Data",
+      },
+    };
+  }, [projects]);
+
   // Handle clicking on future Phase 2 nav items
   const handleNavClick = (item) => {
     setSidebarOpen(false);
@@ -597,23 +692,35 @@ export default function StudentDashboard() {
             </div>
           </section>
 
-          {/* ---------------- 4. ANALYSIS OVERVIEW (UI PLACEHOLDERS) ---------------- */}
+          {/* ---------------- 4. ANALYSIS OVERVIEW ---------------- */}
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100 gap-2">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-slate-900">Analysis Overview</h3>
-                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">
-                    UI Preview Placeholder
-                  </span>
+                  {analysisOverview.hasRealData ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
+                      Active Metrics
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 border border-slate-200">
+                      No analyses yet
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Core metric indicators configured for the upcoming explainable AI analysis pipeline.
+                  {analysisOverview.hasRealData
+                    ? "Aggregated research validation and literature synthesis metrics across your projects."
+                    : "Aggregated metric indicators will appear here once you run an analysis on your research projects."}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200/80">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200/80">
                 {icons.info({ className: "h-4 w-4 text-slate-400 flex-shrink-0" })}
-                <span>Simulated benchmark metrics • Real AI inference runs in Phase 4</span>
+                <span>
+                  {analysisOverview.hasRealData
+                    ? "Live analysis metrics aggregated from your research projects"
+                    : "0 analyses completed • Queue an analysis from Quick Actions or Projects"}
+                </span>
               </div>
             </div>
 
@@ -627,15 +734,29 @@ export default function StudentDashboard() {
                   </div>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-slate-900">84.6%</span>
-                  <span className="text-xs font-semibold text-emerald-600">High Confidence</span>
+                  <span className="text-2xl font-bold text-slate-900">{analysisOverview.gap.value}</span>
+                  <span
+                    className={`text-xs ${
+                      analysisOverview.gap.isConfidence
+                        ? "font-semibold text-emerald-600"
+                        : "font-medium text-slate-400"
+                    }`}
+                  >
+                    {analysisOverview.gap.label}
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
                   Identifies under-explored problem formulations across indexed research corpora.
                 </p>
                 <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Engine: Graph-Reasoner</span>
-                  <span className="font-semibold text-indigo-600">UI Preview</span>
+                  <span>Engine: {analysisOverview.gap.engine}</span>
+                  <span
+                    className={`font-semibold ${
+                      analysisOverview.hasRealData ? "text-indigo-600" : "text-slate-400"
+                    }`}
+                  >
+                    {analysisOverview.gap.badge}
+                  </span>
                 </div>
               </div>
 
@@ -648,15 +769,27 @@ export default function StudentDashboard() {
                   </div>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-slate-900">142</span>
-                  <span className="text-xs font-medium text-slate-500">Papers Synthesized</span>
+                  <span className="text-2xl font-bold text-slate-900">{analysisOverview.literature.value}</span>
+                  <span
+                    className={`text-xs font-medium ${
+                      analysisOverview.literature.value > 0 ? "text-slate-600" : "text-slate-400"
+                    }`}
+                  >
+                    {analysisOverview.literature.label}
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
                   Semantic proximity to top-tier proceedings (NeurIPS, ACL, IEEE, ACM).
                 </p>
                 <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Retrieval: Semantic Scholar</span>
-                  <span className="font-semibold text-blue-600">UI Preview</span>
+                  <span>Retrieval: {analysisOverview.literature.source}</span>
+                  <span
+                    className={`font-semibold ${
+                      analysisOverview.hasRealData ? "text-blue-600" : "text-slate-400"
+                    }`}
+                  >
+                    {analysisOverview.literature.badge}
+                  </span>
                 </div>
               </div>
 
@@ -669,15 +802,29 @@ export default function StudentDashboard() {
                   </div>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-slate-900">0.79</span>
-                  <span className="text-xs font-semibold text-emerald-600">Novelty Index</span>
+                  <span className="text-2xl font-bold text-slate-900">{analysisOverview.contribution.value}</span>
+                  <span
+                    className={`text-xs ${
+                      analysisOverview.hasRealData
+                        ? "font-semibold text-emerald-600"
+                        : "font-medium text-slate-400"
+                    }`}
+                  >
+                    {analysisOverview.contribution.label}
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
                   Quantifies distinction in methodology, datasets, and claims from baseline papers.
                 </p>
                 <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Methodology Variance: High</span>
-                  <span className="font-semibold text-emerald-600">UI Preview</span>
+                  <span>Methodology Variance: {analysisOverview.contribution.variance}</span>
+                  <span
+                    className={`font-semibold ${
+                      analysisOverview.hasRealData ? "text-emerald-600" : "text-slate-400"
+                    }`}
+                  >
+                    {analysisOverview.contribution.badge}
+                  </span>
                 </div>
               </div>
 
@@ -690,15 +837,29 @@ export default function StudentDashboard() {
                   </div>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-slate-900">96.4%</span>
-                  <span className="text-xs font-semibold text-purple-600">Verified</span>
+                  <span className="text-2xl font-bold text-slate-900">{analysisOverview.citation.value}</span>
+                  <span
+                    className={`text-xs ${
+                      analysisOverview.citation.label === "Verified"
+                        ? "font-semibold text-purple-600"
+                        : "font-medium text-slate-400"
+                    }`}
+                  >
+                    {analysisOverview.citation.label}
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
                   Validates direct citations and flags missing seminal references in your problem space.
                 </p>
                 <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Seminal Graph: Active</span>
-                  <span className="font-semibold text-purple-600">UI Preview</span>
+                  <span>Seminal Graph: {analysisOverview.citation.graph}</span>
+                  <span
+                    className={`font-semibold ${
+                      analysisOverview.hasRealData ? "text-purple-600" : "text-slate-400"
+                    }`}
+                  >
+                    {analysisOverview.citation.badge}
+                  </span>
                 </div>
               </div>
             </div>
