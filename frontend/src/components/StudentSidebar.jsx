@@ -115,6 +115,12 @@ const icons = {
       <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
     </svg>
   ),
+  upload: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M12 16V4M12 4l-4 4M12 4l4 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
 };
 
 /* ---------------------------------------------------------
@@ -122,12 +128,14 @@ const icons = {
 --------------------------------------------------------- */
 export const STUDENT_NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", to: "/student/dashboard", icon: icons.dashboard },
+  { id: "checkDocument", label: "Check Document", to: "/student/upload", icon: icons.upload },
+  { id: "myDocuments", label: "My Documents", to: "/student/submissions", icon: icons.manuscripts },
+  { id: "reports", label: "Plagiarism Reports", to: "/student/reports", icon: icons.evidenceReports },
+  { id: "referenceSources", label: "Reference Sources", to: "/student/literature", icon: icons.literature },
+
   { id: "projects", label: "Research Projects", to: "/student/dashboard#projects", icon: icons.projects, isAnchor: true },
-  { id: "manuscripts", label: "Manuscripts", to: "/student/submissions", icon: icons.manuscripts },
-  { id: "literature", label: "Literature", to: "/student/literature", icon: icons.literature },
   { id: "gapAnalysis", label: "Gap Analysis", to: "/student/gap-analysis", icon: icons.gapAnalysis },
   { id: "contributionAnalysis", label: "Contribution Analysis", to: "/student/contribution-analysis", icon: icons.contributionAnalysis },
-  { id: "reports", label: "Evidence Reports", to: "/student/reports", icon: icons.evidenceReports },
   { id: "knowledgeGraph", label: "Knowledge Graph", to: "/student/knowledge-graph", icon: icons.knowledgeGraph },
   { id: "reasoning", label: "Reasoning Workbench", to: "/student/reasoning", icon: icons.sparkles },
   { id: "coverage", label: "Evidence Coverage", to: "/student/evidence-coverage", icon: icons.target },
@@ -284,7 +292,7 @@ export default function StudentSidebar({ isOpen, onClose }) {
                 AI
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium">Research Gap Intelligence</p>
+            <p className="text-[11px] text-slate-400 font-medium">Plagiarism Detector</p>
           </div>
         </Link>
         <button

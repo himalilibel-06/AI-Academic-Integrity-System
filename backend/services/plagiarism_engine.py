@@ -3,25 +3,7 @@ from difflib import SequenceMatcher
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-
-# Baseline academic reference corpus
-REFERENCE_CORPUS = [
-    {
-        "id": "ref_1",
-        "title": "Artificial Intelligence",
-        "text": "Artificial intelligence is a field of computer science that focuses on creating intelligent systems."
-    },
-    {
-        "id": "ref_2",
-        "title": "Machine Learning",
-        "text": "Machine learning allows computer systems to learn from data and improve their performance."
-    },
-    {
-        "id": "ref_3",
-        "title": "Academic Integrity",
-        "text": "Academic integrity ensures honesty, originality, and responsible behavior in educational work."
-    }
-]
+from services.literature_corpus import literature_corpus
 
 
 def split_into_sentences(text: str) -> list:
@@ -110,13 +92,15 @@ def calculate_similarity(target_text: str, historical_documents: list = None):
     all_corpus = []
 
     # 1. Reference corpus documents
-    for doc in REFERENCE_CORPUS:
-        all_corpus.append({
-            "id": doc["id"],
-            "title": doc["title"],
-            "text": doc["text"],
-            "type": "Academic Reference Corpus"
-        })
+    for paper in literature_corpus.get_all_papers():
+        paper_text = literature_corpus.get_searchable_representation(paper)
+        if paper_text:
+            all_corpus.append({
+                "id": paper.get("paper_id", "unknown"),
+                "title": paper.get("title", "Untitled Reference"),
+                "text": paper_text,
+                "type": "Academic Reference Corpus (Abstract/Metadata)"
+            })
 
     # 2. Relevant previous submissions
     peer_submission_count = 0
@@ -246,7 +230,7 @@ def calculate_similarity(target_text: str, historical_documents: list = None):
     # 9. Explainable evidence summary
     evidence_summary = {
         "sources_compared": len(all_corpus),
-        "reference_sources_compared": len(REFERENCE_CORPUS),
+        "reference_sources_compared": len(literature_corpus.get_all_papers()),
         "peer_submissions_compared": peer_submission_count,
         "matched_segments": total_matched_segments,
         "strongest_match": strongest_match,
