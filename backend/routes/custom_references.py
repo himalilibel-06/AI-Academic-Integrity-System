@@ -34,8 +34,16 @@ router = APIRouter(
 ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx"}
 MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB
 
-REFERENCES_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "references"
+_env_uploads_dir = os.getenv("UPLOADS_DIR")
+if _env_uploads_dir:
+    UPLOADS_DIR = Path(_env_uploads_dir).resolve()
+else:
+    UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+REFERENCES_UPLOAD_DIR = UPLOADS_DIR / "references"
 REFERENCES_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 
 
 def sanitize_filename(filename: str) -> str:

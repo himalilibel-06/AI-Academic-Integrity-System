@@ -1,10 +1,17 @@
+import os
 import sqlite3
 from pathlib import Path
 
 
 # Location of the SQLite database
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATABASE_PATH = BASE_DIR / "academic_integrity.db"
+
+_env_db_path = os.getenv("DATABASE_PATH")
+if _env_db_path:
+    DATABASE_PATH = Path(_env_db_path).resolve()
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+else:
+    DATABASE_PATH = BASE_DIR / "academic_integrity.db"
 
 
 def get_connection():
@@ -12,7 +19,11 @@ def get_connection():
     Create and return a connection to the SQLite database.
     Enforces foreign key constraint checks.
     """
-    connection = sqlite3.connect(DATABASE_PATH)
+    db_path = Path(DATABASE_PATH)
+    if db_path.parent:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    connection = sqlite3.connect(db_path)
 
     # Enable foreign key support in SQLite
     connection.execute("PRAGMA foreign_keys = ON;")
@@ -21,6 +32,7 @@ def get_connection():
     connection.row_factory = sqlite3.Row
 
     return connection
+
 
 
 def initialize_database():
