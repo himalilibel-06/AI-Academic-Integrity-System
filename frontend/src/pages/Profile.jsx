@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getCurrentUser, updateUserProfile, changePassword } from "../service/api";
+import ProfessorSidebar from "../components/ProfessorSidebar";
 
 function getInitials(name) {
   if (!name) return "U";
@@ -306,7 +307,7 @@ export default function Profile() {
         {isProfessor && (
           <div className="fixed inset-x-0 top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
             <span className="text-lg font-semibold text-slate-900">
-              Integrity<span className="text-emerald-600">Check</span>
+              Integrity<span className="text-blue-600">Check</span>
             </span>
             <button
               type="button"
@@ -314,7 +315,7 @@ export default function Profile() {
               aria-expanded={sidebarOpen}
               aria-controls="profile-sidebar"
               aria-label="Toggle navigation menu"
-              className="rounded-md border border-slate-200 p-2 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="rounded-md border border-slate-200 p-2 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -323,66 +324,25 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Sidebar */}
-        {isProfessor && (
-          <aside
-            id="profile-sidebar"
-            className={`fixed inset-y-0 left-0 z-20 w-64 transform border-r border-slate-800 bg-[#0F172A] transition-transform duration-200 lg:static lg:translate-x-0 ${
-              sidebarOpen ? "translate-x-0" : "-translate-x-full"
-            } pt-16 lg:pt-0`}
-          >
-            <div className="flex h-full flex-col">
-              <div className="hidden border-b border-slate-800 px-6 py-5 lg:block">
-                <span className="text-lg font-semibold text-white">
-                  Integrity<span className="text-emerald-400">Check</span>
-                </span>
-              </div>
-              <nav className="flex-1 space-y-1 px-3 py-4">
-                {sidebarItems.map((item) => {
-                  const isActive = item.label === "Profile";
-                  return (
-                    <Link
-                      key={item.label}
-                      to={item.href}
-                      className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                        isActive
-                          ? "bg-emerald-500 text-white"
-                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                      }`}
-                      aria-current={isActive ? "page" : undefined}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
-              <div className="border-t border-slate-800 px-3 py-4">
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="w-full text-left rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          </aside>
+        {/* Mobile sidebar overlay */}
+        {isProfessor && sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs lg:hidden transition-opacity"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
         )}
 
-        {isProfessor && sidebarOpen && (
-          <button
-            type="button"
-            aria-label="Close navigation menu"
-            onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 z-10 bg-slate-900/30 lg:hidden"
-          />
+        {/* Unified Professor Sidebar */}
+        {isProfessor && (
+          <ProfessorSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         )}
 
         {/* Main content */}
         <main className={`w-full flex-1 px-4 pb-12 ${isProfessor ? "min-h-screen pt-20 sm:px-6 lg:px-10 lg:pt-10" : "py-8 sm:px-8 lg:px-10"}`}>
           {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="mb-3 text-sm text-slate-500">
-            <Link to={dashboardHref} className="hover:text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded">
+            <Link to={dashboardHref} className="hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">
               Dashboard
             </Link>
             <span className="mx-2" aria-hidden="true">/</span>
@@ -399,7 +359,7 @@ export default function Profile() {
 
           {loading ? (
             <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-r-transparent" />
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent" />
               <p className="mt-3 text-sm text-slate-600">Loading profile information...</p>
             </div>
           ) : fetchError ? (
@@ -437,7 +397,7 @@ export default function Profile() {
                 <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-4">
                     <div
-                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg font-semibold text-white uppercase shadow-sm"
+                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-blue-600 text-lg font-semibold text-white uppercase shadow-sm"
                       aria-hidden="true"
                     >
                       {getInitials(profile.fullName)}
@@ -446,7 +406,7 @@ export default function Profile() {
                       <h2 className="text-lg font-semibold text-slate-900">{profile.fullName || "User"}</h2>
                       <p className="text-sm text-slate-500">{profile.email}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 capitalize">
+                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 capitalize">
                           {isProfessor ? "Professor" : "Student"}
                         </span>
                         {profile.department && (
@@ -462,7 +422,7 @@ export default function Profile() {
                     <button
                       type="button"
                       onClick={handleStartEdit}
-                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
@@ -491,7 +451,7 @@ export default function Profile() {
                               type="text"
                               value={draftProfile.fullName}
                               onChange={(e) => handleDraftChange("fullName", e.target.value)}
-                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                               placeholder="Your full name"
                             />
                             {errors.fullName && (
@@ -517,7 +477,7 @@ export default function Profile() {
                             type="tel"
                             value={draftProfile.phone}
                             onChange={(e) => handleDraftChange("phone", e.target.value)}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                             placeholder="+1 555-0100"
                           />
                         ) : (
@@ -533,7 +493,7 @@ export default function Profile() {
                             type="text"
                             value={draftProfile.department}
                             onChange={(e) => handleDraftChange("department", e.target.value)}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                             placeholder="e.g. Computer Science"
                           />
                         ) : (
@@ -549,7 +509,7 @@ export default function Profile() {
                             type="text"
                             value={draftProfile.institution}
                             onChange={(e) => handleDraftChange("institution", e.target.value)}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                             placeholder="e.g. University School of Engineering"
                           />
                         ) : (
@@ -564,7 +524,7 @@ export default function Profile() {
                           type="button"
                           onClick={handleSaveChanges}
                           disabled={isSaving}
-                          className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
+                          className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                         >
                           {isSaving ? "Saving..." : "Save Changes"}
                         </button>
@@ -572,7 +532,7 @@ export default function Profile() {
                           type="button"
                           onClick={handleCancelEdit}
                           disabled={isSaving}
-                          className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           Cancel
                         </button>
@@ -600,7 +560,7 @@ export default function Profile() {
                     <button
                       type="button"
                       onClick={openPasswordModal}
-                      className="mt-4 inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="mt-4 inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       Change Password
                     </button>
@@ -658,7 +618,7 @@ export default function Profile() {
                   <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex items-center justify-between">
                       <h3 className="text-base font-semibold text-slate-900">Profile Completion</h3>
-                      <span className="text-sm font-semibold text-emerald-600">{profileCompletion}%</span>
+                      <span className="text-sm font-semibold text-blue-600">{profileCompletion}%</span>
                     </div>
                     <div
                       role="progressbar"
@@ -669,7 +629,7 @@ export default function Profile() {
                       className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100"
                     >
                       <div
-                        className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                        className="h-full rounded-full bg-blue-600 transition-all duration-300"
                         style={{ width: `${profileCompletion}%` }}
                       />
                     </div>
@@ -723,10 +683,11 @@ export default function Profile() {
                 <FieldLabel htmlFor="currentPassword">Current Password</FieldLabel>
                 <input
                   id="currentPassword"
+                  name="currentPassword"
                   type="password"
                   value={passwordFields.currentPassword}
                   onChange={(e) => handlePasswordFieldChange("currentPassword", e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                   placeholder="••••••••"
                 />
                 {passwordErrors.currentPassword && (
@@ -738,10 +699,11 @@ export default function Profile() {
                 <FieldLabel htmlFor="newPassword">New Password</FieldLabel>
                 <input
                   id="newPassword"
+                  name="newPassword"
                   type="password"
                   value={passwordFields.newPassword}
                   onChange={(e) => handlePasswordFieldChange("newPassword", e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                   placeholder="Minimum 6 characters"
                 />
                 {passwordErrors.newPassword && (
@@ -753,10 +715,11 @@ export default function Profile() {
                 <FieldLabel htmlFor="confirmPassword">Confirm New Password</FieldLabel>
                 <input
                   id="confirmPassword"
+                  name="confirmPassword"
                   type="password"
                   value={passwordFields.confirmPassword}
                   onChange={(e) => handlePasswordFieldChange("confirmPassword", e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                   placeholder="Repeat new password"
                 />
                 {passwordErrors.confirmPassword && (
@@ -770,7 +733,7 @@ export default function Profile() {
                 type="button"
                 onClick={closePasswordModal}
                 disabled={isChangingPassword}
-                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Cancel
               </button>
@@ -778,7 +741,7 @@ export default function Profile() {
                 type="button"
                 onClick={handleUpdatePassword}
                 disabled={isChangingPassword}
-                className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
+                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
               >
                 {isChangingPassword ? "Updating..." : "Update Password"}
               </button>

@@ -121,29 +121,26 @@ const icons = {
       <path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  researchAreas: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
+      <path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" strokeLinecap="round" />
+    </svg>
+  ),
 };
 
 /* ---------------------------------------------------------
-   Canonical 15-Item GapGuard Student Navigation Structure
+   Core GapGuard AI Document Similarity Checker Navigation
 --------------------------------------------------------- */
 export const STUDENT_NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", to: "/student/dashboard", icon: icons.dashboard },
-  { id: "checkDocument", label: "Check Document", to: "/student/upload", icon: icons.upload },
-  { id: "myDocuments", label: "My Documents", to: "/student/submissions", icon: icons.manuscripts },
-  { id: "reports", label: "Plagiarism Reports", to: "/student/reports", icon: icons.evidenceReports },
-  { id: "referenceSources", label: "Reference Sources", to: "/student/literature", icon: icons.literature },
-
-  { id: "projects", label: "Research Projects", to: "/student/dashboard#projects", icon: icons.projects, isAnchor: true },
-  { id: "gapAnalysis", label: "Gap Analysis", to: "/student/gap-analysis", icon: icons.gapAnalysis },
-  { id: "contributionAnalysis", label: "Contribution Analysis", to: "/student/contribution-analysis", icon: icons.contributionAnalysis },
-  { id: "knowledgeGraph", label: "Knowledge Graph", to: "/student/knowledge-graph", icon: icons.knowledgeGraph },
-  { id: "reasoning", label: "Reasoning Workbench", to: "/student/reasoning", icon: icons.sparkles },
-  { id: "coverage", label: "Evidence Coverage", to: "/student/evidence-coverage", icon: icons.target },
-  { id: "revision", label: "Revision Comparison", to: "/student/revision-comparison", icon: icons.revisionHistory },
-  { id: "readiness", label: "Submission Readiness", to: "/student/submission-readiness", icon: icons.check },
-  { id: "feedback", label: "Faculty Feedback", to: "/student/faculty-feedback", icon: icons.feedback },
-  { id: "profile", label: "Profile", to: "/student/profile", icon: icons.profile },
+  { id: "checkDocument", label: "Check Similarity", to: "/student/upload", icon: icons.upload },
+  { id: "myDocuments", label: "My Analyses", to: "/student/submissions", icon: icons.manuscripts },
+  { id: "reports", label: "Similarity Reports", to: "/student/reports", icon: icons.evidenceReports },
+  { id: "referenceSources", label: "My References", to: "/student/literature", icon: icons.literature },
   { id: "settings", label: "Settings", to: "/student/settings", icon: icons.settings },
+  { id: "profileInfo", label: "Profile Info", to: "/student/profile", icon: icons.profile },
 ];
 
 export default function StudentSidebar({ isOpen, onClose }) {
@@ -154,145 +151,85 @@ export default function StudentSidebar({ isOpen, onClose }) {
   const researcherInfo = useMemo(() => {
     const name = user?.name || user?.full_name || "Research Student";
     const email = user?.email || "student@university.edu";
-    const initials = name
-      .split(" ")
-      .filter(Boolean)
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "RS";
-    return { name, email, initials };
+    const firstLetter = (name.trim().charAt(0) || "U").toUpperCase();
+    return { name, email, firstLetter };
   }, [user]);
 
-  // Determine active item id based on current path and hash
+  // Determine active item id based on current path
   const activeItemId = useMemo(() => {
-    const { pathname, hash } = location;
+    const { pathname } = location;
 
     if (pathname === "/student/dashboard" || pathname === "/dashboard") {
-      if (hash === "#projects" || hash === "#research-projects-section") {
-        return "projects";
-      }
       return "dashboard";
     }
 
-    if (
-      pathname === "/student/projects" ||
-      pathname === "/research-projects" ||
-      pathname === "/student/projects/create"
-    ) {
-      return "projects";
+    if (pathname.startsWith("/student/upload")) {
+      return "checkDocument";
     }
 
     if (
-      pathname === "/student/submissions" ||
-      pathname === "/student/upload" ||
+      pathname.startsWith("/student/submissions") ||
       pathname === "/student/manuscripts" ||
       pathname === "/manuscripts"
     ) {
-      return "manuscripts";
-    }
-
-    if (pathname.startsWith("/student/literature") || pathname === "/literature") {
-      return "literature";
-    }
-
-    if (pathname.startsWith("/student/gap-analysis") || pathname === "/gap-analysis") {
-      return "gapAnalysis";
-    }
-
-    if (pathname.startsWith("/student/contribution-analysis") || pathname === "/contribution-analysis") {
-      return "contributionAnalysis";
+      return "myDocuments";
     }
 
     if (pathname.startsWith("/student/reports")) {
       return "reports";
     }
 
-    if (pathname.startsWith("/student/knowledge-graph") || pathname === "/knowledge-graph") {
-      return "knowledgeGraph";
+    if (pathname.startsWith("/student/literature") || pathname === "/literature") {
+      return "referenceSources";
     }
 
-    if (pathname.startsWith("/student/reasoning") || pathname === "/reasoning") {
-      return "reasoning";
-    }
-
-    if (pathname.startsWith("/student/evidence-coverage") || pathname === "/evidence-coverage") {
-      return "coverage";
-    }
-
-    if (pathname.startsWith("/student/revision-comparison") || pathname === "/revision-comparison") {
-      return "revision";
-    }
-
-    if (pathname.startsWith("/student/submission-readiness") || pathname === "/submission-readiness") {
-      return "readiness";
-    }
-
-    if (
-      pathname.startsWith("/student/faculty-feedback") ||
-      pathname.startsWith("/student/revision-history") ||
-      pathname === "/faculty-feedback"
-    ) {
-      return "feedback";
-    }
-
-    if (pathname.startsWith("/student/profile")) {
-      return "profile";
-    }
-
-    if (pathname.startsWith("/student/settings")) {
+    if (pathname.startsWith("/student/settings") || pathname === "/settings") {
       return "settings";
     }
 
-    return "dashboard";
-  }, [location.pathname, location.hash]);
+    if (pathname.startsWith("/student/profile") || pathname === "/profile") {
+      return "profileInfo";
+    }
+
+    return "";
+  }, [location.pathname]);
 
   const handleItemClick = (item) => {
     if (onClose) onClose();
+  };
 
-    if (item.id === "projects") {
-      if (location.pathname === "/student/dashboard") {
-        const el =
-          document.getElementById("research-projects-section") ||
-          document.getElementById("projects");
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth" });
-          window.location.hash = "#projects";
-        }
-      } else {
-        navigate("/student/dashboard#projects");
-      }
-    }
+  const handleLogout = () => {
+    if (onClose) onClose();
+    logout();
   };
 
   return (
     <aside
-      className={`fixed z-50 inset-y-0 left-0 w-72 transform bg-[#0B1120] text-slate-200 px-5 py-6 flex flex-col transition-transform duration-200 lg:static lg:translate-x-0 lg:flex-shrink-0 border-r border-slate-800 ${
+      className={`fixed z-50 inset-y-0 left-0 w-72 h-screen max-h-screen transform bg-[#0B1120] text-slate-200 px-5 py-6 flex flex-col transition-transform duration-200 lg:sticky lg:top-0 lg:translate-x-0 lg:flex-shrink-0 border-r border-slate-800 ${
         isOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
       {/* Brand identity header */}
-      <div className="flex items-center justify-between pb-5 border-b border-slate-800/80">
+      <div className="flex items-center justify-between pb-5 border-b border-slate-800/80 flex-shrink-0">
         <Link
           to="/student/dashboard"
           onClick={() => onClose && onClose()}
           className="flex items-center gap-3 group text-left"
         >
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-emerald-400 p-0.5 shadow-md shadow-indigo-950/50">
-            <div className="w-full h-full bg-[#0B1120] rounded-[10px] flex items-center justify-center text-indigo-400 group-hover:text-emerald-400 transition-colors">
-              {icons.sparkles({ className: "h-5 w-5" })}
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-0.5 shadow-md shadow-blue-950/50">
+            <div className="w-full h-full bg-[#0B1120] rounded-[10px] flex items-center justify-center text-blue-400 group-hover:text-blue-300 transition-colors">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-base font-bold tracking-tight text-white group-hover:text-slate-100 transition-colors">
-                GapGuard
-              </span>
-              <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                AI
+                Plagiarism Detector
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium">Plagiarism Detector</p>
+            <p className="text-[11px] text-blue-300/80 font-medium">Academic Integrity System</p>
           </div>
         </Link>
         <button
@@ -306,12 +243,12 @@ export default function StudentSidebar({ isOpen, onClose }) {
       </div>
 
       {/* Navigation section label */}
-      <div className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-2">
-        Research Workflow
+      <div className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-2 flex-shrink-0">
+        Student Navigation
       </div>
 
       {/* Navigation list */}
-      <nav className="mt-2 flex-1 space-y-1 overflow-y-auto pr-1">
+      <nav className="mt-2 flex-1 min-h-0 space-y-1 overflow-y-auto pr-1">
         {STUDENT_NAV_ITEMS.map((item) => {
           const isActive = activeItemId === item.id;
 
@@ -326,7 +263,7 @@ export default function StudentSidebar({ isOpen, onClose }) {
                 onClick={() => handleItemClick(item)}
                 className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all text-left ${
                   isActive
-                    ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-900/30 font-semibold"
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-900/40 font-semibold"
                     : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
                 }`}
               >
@@ -351,7 +288,7 @@ export default function StudentSidebar({ isOpen, onClose }) {
               onClick={() => onClose && onClose()}
               className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                 isActive
-                  ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-900/30 font-semibold"
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-900/40 font-semibold"
                   : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
               }`}
             >
@@ -367,28 +304,36 @@ export default function StudentSidebar({ isOpen, onClose }) {
         })}
       </nav>
 
-      {/* Sidebar Researcher Profile / Logout Footer */}
-      <div className="pt-4 border-t border-slate-800/80 mt-auto space-y-2">
+      {/* Bottom User Section */}
+      <div className="pt-4 border-t border-slate-800/80 mt-auto flex-shrink-0 space-y-2">
+        {/* User Profile Card */}
         <Link
           to="/student/profile"
+          id="student-bottom-profile-card"
           onClick={() => onClose && onClose()}
-          className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 hover:bg-slate-800/70 transition-all text-left"
+          className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition-colors text-left group"
         >
-          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-600 to-emerald-500 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0 shadow-xs">
-            {researcherInfo.initials}
+          <div className="h-9 w-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm">
+            {researcherInfo.firstLetter}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-white truncate">{researcherInfo.name}</p>
-            <p className="text-[11px] text-slate-400 truncate">{researcherInfo.email}</p>
+            <p className="text-sm font-semibold text-white truncate group-hover:text-blue-300 transition-colors">
+              {researcherInfo.name}
+            </p>
+            <p className="text-xs text-slate-400 truncate">
+              {researcherInfo.email}
+            </p>
           </div>
         </Link>
 
+        {/* Sign Out Button */}
         <button
           type="button"
-          onClick={logout}
-          className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-slate-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
+          id="student-sign-out"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-colors text-left group"
         >
-          {icons.logout({ className: "h-4 w-4" })}
+          {icons.logout({ className: "h-4.5 w-4.5 flex-shrink-0 text-slate-400 group-hover:text-white transition-colors" })}
           <span>Sign Out</span>
         </button>
       </div>

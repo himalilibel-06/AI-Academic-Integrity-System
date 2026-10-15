@@ -1,7 +1,9 @@
 import os
 import re
 import uuid
+import json
 from pathlib import Path
+from typing import Optional, List
 
 from fastapi import (
     APIRouter,
@@ -19,8 +21,11 @@ from models.course import get_course_by_id_or_code, is_student_enrolled
 from models.submission import (
     create_submission,
     get_submission_by_id,
-    get_historical_submissions_for_corpus,
     update_submission_status,
+)
+from models.custom_reference import (
+    get_custom_references_by_user,
+    create_custom_reference,
 )
 from models.report import create_plagiarism_report
 from utils.auth import get_current_user_payload
@@ -39,6 +44,9 @@ ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx"}
 UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
+REFERENCES_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "references"
+REFERENCES_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize the uploaded file's original name."""
@@ -52,9 +60,14 @@ def sanitize_filename(filename: str) -> str:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def submit_document(
-    title: str = Form(...),
-    course_id: str = Form(...),
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    title: Optional[str] = Form(None),
+    course_id: Optional[str] = Form(None),
+    custom_reference_ids: Optional[str] = Form(None),
+    reference_files: Optional[List[UploadFile]] = File(None),
+    reference_file: Optional[UploadFile] = File(None),
+    document: Optional[UploadFile] = File(None),
+    paper: Optional[UploadFile] = File(None),
     payload: dict = Depends(get_current_user_payload),
 ):
     """
@@ -65,7 +78,7 @@ async def submit_document(
     # 1. Authorize: only students may submit
     user_role = payload.get("role")
 
-    if user_role != "student":
+    if user_role not in ["student", "user"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only students are permitted to submit assignments.",
@@ -87,31 +100,15 @@ async def submit_document(
             detail="Invalid user ID format in token.",
         )
 
-    # 2. Validate input fields
-    clean_title = title.strip()
-
-    if not clean_title:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Assignment title is required.",
-        )
-
-    clean_course_input = course_id.strip()
-
-    if not clean_course_input:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Course selection is required.",
-        )
-
-    # 3. Validate file
-    if not file or not file.filename:
+    # 2. Validate primary research paper file
+    primary_file = file or document or paper
+    if not primary_file or not getattr(primary_file, "filename", None) or not primary_file.filename.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A document file must be provided.",
         )
 
-    file_ext = Path(file.filename).suffix.lower()
+    file_ext = Path(primary_file.filename).suffix.lower()
 
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -119,43 +116,38 @@ async def submit_document(
             detail="Unsupported file format. Please upload PDF, DOCX, or TXT.",
         )
 
+    # 3. Resolve title with safe fallback to file stem
+    clean_title = (title or "").strip()
+    if not clean_title:
+        file_stem = Path(primary_file.filename).stem.strip()
+        clean_title = file_stem if file_stem else "Research Paper"
+
+    clean_course_input = (course_id or "").strip()
+    resolved_course_id = None
+
     connection = get_connection()
 
     try:
-        # 4. Resolve and validate course_id
-        course = get_course_by_id_or_code(
-            connection,
-            clean_course_input,
-        )
-
-        if not course:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"Course '{clean_course_input}' does not exist. "
-                    "Please select a valid course."
-                ),
+        # 4. Resolve optional course_id if explicitly provided
+        if clean_course_input:
+            course = get_course_by_id_or_code(
+                connection,
+                clean_course_input,
             )
-
-        resolved_course_id = course["id"]
-
-        # Verify authenticated student is enrolled in the selected course
-        if not is_student_enrolled(
-            connection,
-            resolved_course_id,
-            student_id_int,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    f"You are not enrolled in "
-                    f"'{course['code']} - {course['name']}'. "
-                    "Please enroll in the course before submitting."
-                ),
-            )
+            if not course:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Course '{clean_course_input}' not found.",
+                )
+            if not is_student_enrolled(connection, course["id"], student_id_int):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not enrolled in this course.",
+                )
+            resolved_course_id = course["id"]
 
         # 5. Read file bytes
-        file_bytes = await file.read()
+        file_bytes = await primary_file.read()
 
         if not file_bytes:
             raise HTTPException(
@@ -167,7 +159,7 @@ async def submit_document(
         try:
             extracted_text = extract_text(
                 file_bytes,
-                file.filename,
+                primary_file.filename,
             )
         except ValueError as err:
             raise HTTPException(
@@ -191,7 +183,7 @@ async def submit_document(
             )
 
         # 8. Save uploaded file safely on disk
-        safe_orig_name = sanitize_filename(file.filename)
+        safe_orig_name = sanitize_filename(primary_file.filename)
 
         unique_file_name = (
             f"{uuid.uuid4().hex}_{safe_orig_name}"
@@ -212,25 +204,126 @@ async def submit_document(
             student_id=student_id_int,
             course_id=resolved_course_id,
             title=clean_title,
-            filename=file.filename,
+            filename=primary_file.filename,
             file_path=relative_file_path,
-            file_type=file.content_type or file_ext,
+            file_type=primary_file.content_type or file_ext,
             original_text=extracted_text,
             processed_text=processed_text,
             status="pending",
         )
 
-        # 10. Run similarity analysis
-        # Compare against reference corpus and prior peer submissions
-        historical_docs = get_historical_submissions_for_corpus(
+        # 10. Process and extract uploaded reference documents (if provided)
+        all_incoming_refs = []
+        if reference_files:
+            if isinstance(reference_files, list):
+                all_incoming_refs.extend(reference_files)
+            else:
+                all_incoming_refs.append(reference_files)
+        if reference_file:
+            all_incoming_refs.append(reference_file)
+
+        new_custom_refs = []
+        if all_incoming_refs:
+            for ref_file in all_incoming_refs:
+                if not ref_file or not getattr(ref_file, "filename", None):
+                    continue
+                if not ref_file.filename.strip():
+                    continue
+
+                ref_ext = Path(ref_file.filename).suffix.lower()
+                if ref_ext not in ALLOWED_EXTENSIONS:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Unsupported format for reference file '{ref_file.filename}'. Please upload PDF, DOCX, or TXT.",
+                    )
+
+                ref_bytes = await ref_file.read()
+                if not ref_bytes or len(ref_bytes.strip()) == 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Uploaded reference file '{ref_file.filename}' is empty.",
+                    )
+
+                try:
+                    ref_extracted = extract_text(ref_bytes, ref_file.filename)
+                except ValueError as err:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Error reading reference file '{ref_file.filename}': {err}",
+                    )
+
+                if not ref_extracted or not ref_extracted.strip():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"No readable text could be extracted from reference file '{ref_file.filename}'.",
+                    )
+
+                ref_processed = preprocess_text(ref_extracted)
+
+                safe_ref_name = sanitize_filename(ref_file.filename)
+                unique_ref_name = f"{uuid.uuid4().hex}_{safe_ref_name}"
+                saved_ref_disk_path = REFERENCES_UPLOAD_DIR / unique_ref_name
+                with open(saved_ref_disk_path, "wb") as rf:
+                    rf.write(ref_bytes)
+                ref_rel_path = str(Path("uploads") / "references" / unique_ref_name)
+
+                ref_title = Path(ref_file.filename).stem or ref_file.filename
+                new_ref_id = create_custom_reference(
+                    connection=connection,
+                    user_id=student_id_int,
+                    title=ref_title,
+                    filename=ref_file.filename,
+                    file_path=ref_rel_path,
+                    original_text=ref_extracted,
+                    processed_text=ref_processed,
+                )
+                new_custom_refs.append({
+                    "id": new_ref_id,
+                    "title": ref_title,
+                    "filename": ref_file.filename,
+                    "original_text": ref_extracted,
+                    "processed_text": ref_processed,
+                })
+
+        # Gather references strictly for user-provided similarity calculation
+        custom_refs = list(new_custom_refs)
+        existing_refs = get_custom_references_by_user(
             connection,
-            exclude_submission_id=submission_id,
-            course_id=resolved_course_id,
+            student_id_int,
         )
 
+        if custom_reference_ids and custom_reference_ids.strip():
+            raw_sel = custom_reference_ids.strip()
+            if raw_sel.lower() in ("none", "[]", "empty"):
+                # User explicitly requested no saved references to be included
+                pass
+            elif raw_sel.lower() == "all":
+                for r in existing_refs:
+                    if not any(nr.get("id") == r.get("id") for nr in custom_refs):
+                        custom_refs.append(r)
+            else:
+                try:
+                    if raw_sel.startswith("["):
+                        parsed_ids = {int(x) for x in json.loads(raw_sel) if str(x).isdigit()}
+                    else:
+                        parsed_ids = {int(x.strip()) for x in raw_sel.split(",") if x.strip().isdigit()}
+                    if parsed_ids:
+                        for r in existing_refs:
+                            if r.get("id") in parsed_ids and not any(nr.get("id") == r.get("id") for nr in custom_refs):
+                                custom_refs.append(r)
+                except Exception:
+                    pass
+        elif not new_custom_refs:
+            # Fallback to saved references if no reference files were uploaded in this submission
+            for r in existing_refs:
+                if not any(nr.get("id") == r.get("id") for nr in custom_refs):
+                    custom_refs.append(r)
+
         analysis_result = calculate_similarity(
-            processed_text,
-            historical_documents=historical_docs,
+            target_text=processed_text,
+            custom_references=custom_refs,
+            original_text=extracted_text,
+            exclude_submission_id=submission_id,
         )
 
         overall_similarity = analysis_result[
@@ -329,7 +422,7 @@ def download_submission_file(
             )
 
         # Ownership and authorization checks
-        if user_role == "student":
+        if user_role in ["student", "user"]:
 
             if submission["student_id"] != user_id_int:
                 raise HTTPException(

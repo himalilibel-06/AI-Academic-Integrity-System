@@ -53,17 +53,20 @@ function NotFound() {
 }
 
 function ProtectedRoute({ children, allowedRoles }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600 font-medium">Loading session...</div>
+        <div className="flex flex-col items-center gap-3">
+          <span className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="text-slate-600 text-sm font-medium">Verifying session...</div>
+        </div>
       </div>
     );
   }
 
-  if (!user) {
+  if (!user || !isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
@@ -76,28 +79,28 @@ function ProtectedRoute({ children, allowedRoles }) {
 }
 
 function PublicOnlyRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600 font-medium">Loading session...</div>
+        <div className="flex flex-col items-center gap-3">
+          <span className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="text-slate-600 text-sm font-medium">Verifying session...</div>
+        </div>
       </div>
     );
   }
 
-  if (user) {
-    const redirectPath = user.role === "professor" ? "/professor/dashboard" : "/student/dashboard";
-    return <Navigate to={redirectPath} replace />;
+  if (user && isAuthenticated) {
+    return <Navigate to="/student/dashboard" replace />;
   }
 
   return children;
 }
 
 function DashboardRedirect() {
-  const { user } = useAuth();
-  const target = user?.role === "professor" ? "/professor/dashboard" : "/student/dashboard";
-  return <Navigate to={target} replace />;
+  return <Navigate to="/student/dashboard" replace />;
 }
 
 export default function App() {
@@ -115,14 +118,14 @@ export default function App() {
           {/* Student routes (protected with shared StudentLayout) */}
           <Route
             element={
-              <ProtectedRoute allowedRoles={["student"]}>
+              <ProtectedRoute allowedRoles={["student", "professor"]}>
                 <StudentLayout />
               </ProtectedRoute>
             }
           >
             <Route path="/student/dashboard" element={<StudentDashboard />} />
             <Route path="/student/projects/create" element={<CreateResearchProject />} />
-            <Route path="/student/courses" element={<StudentCourses />} />
+            <Route path="/student/courses" element={<Navigate to="/student/dashboard" replace />} />
             <Route path="/student/upload" element={<UploadSubmission />} />
             <Route path="/student/literature" element={<LiteratureCorpus />} />
             <Route path="/student/gap-analysis" element={<GapAnalysis />} />
@@ -142,6 +145,7 @@ export default function App() {
           </Route>
           <Route path="/student/projects" element={<Navigate to="/student/dashboard#projects" replace />} />
           <Route path="/student/manuscripts" element={<Navigate to="/student/submissions" replace />} />
+          <Route path="/student/research-areas" element={<Navigate to="/student/dashboard" replace />} />
 
           {/* Professor routes (protected) */}
           <Route path="/professor/dashboard" element={<ProtectedRoute allowedRoles={["professor"]}><ProfessorDashboard /></ProtectedRoute>} />
@@ -160,6 +164,7 @@ export default function App() {
 
           {/* Friendly Aliases / Deep Links */}
           <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["student", "professor"]}><DashboardRedirect /></ProtectedRoute>} />
+          <Route path="/research-areas" element={<Navigate to="/student/dashboard" replace />} />
           <Route path="/research-projects" element={<Navigate to="/student/dashboard#projects" replace />} />
           <Route path="/manuscripts" element={<Navigate to="/student/submissions" replace />} />
           <Route path="/literature" element={<Navigate to="/student/literature" replace />} />

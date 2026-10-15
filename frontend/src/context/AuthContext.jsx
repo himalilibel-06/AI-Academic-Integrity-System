@@ -21,14 +21,18 @@ export function AuthProvider({ children }) {
 
       try {
         const response = await getCurrentUser();
-        if (response.success && response.user) {
+        if (response && response.success && response.user) {
           setUser(response.user);
           setToken(storedToken);
         } else {
-          logout();
+          localStorage.removeItem("auth_token");
+          setToken(null);
+          setUser(null);
         }
       } catch {
-        logout();
+        localStorage.removeItem("auth_token");
+        setToken(null);
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -57,6 +61,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("auth_token");
     setToken(null);
     setUser(null);
+    window.location.replace("/login");
   };
 
   const value = {

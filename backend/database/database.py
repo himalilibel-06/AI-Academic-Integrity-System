@@ -208,6 +208,24 @@ def initialize_database():
         )
     """)
 
+    # 10. Custom Scholar References table (user-provided reference papers for plagiarism comparison)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_references (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            author TEXT DEFAULT '',
+            publication_year TEXT DEFAULT '',
+            research_field TEXT DEFAULT '',
+            filename TEXT DEFAULT '',
+            file_path TEXT DEFAULT '',
+            original_text TEXT NOT NULL,
+            processed_text TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
     # Seed default research projects if empty
     cursor.execute("SELECT COUNT(*) AS cnt FROM research_projects")
     if cursor.fetchone()["cnt"] == 0:
@@ -387,6 +405,7 @@ def initialize_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_faculty_reviews_project ON faculty_reviews(project_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_research_manuscripts_project ON research_manuscripts(project_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_review_cycles_project ON faculty_review_cycles(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_references_user ON custom_references(user_id)")
 
     connection.commit()
     connection.close()

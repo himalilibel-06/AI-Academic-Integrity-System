@@ -175,3 +175,37 @@ def get_latest_report_by_student(connection, student_id):
     )
 
     return cursor.fetchone()
+
+
+def get_latest_report_for_professor(connection, professor_id):
+    """
+    Fetch the latest report submitted to any course taught by a specific professor.
+    """
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT r.id,
+               r.submission_id,
+               r.overall_similarity_score,
+               r.risk_level,
+               r.matches,
+               r.review_status,
+               r.professor_feedback,
+               r.reviewed_by,
+               r.reviewed_at,
+               r.created_at,
+               r.evidence_details,
+               u_prof.name AS reviewed_by_name
+        FROM plagiarism_reports r
+        JOIN submissions s ON r.submission_id = s.id
+        JOIN courses c ON s.course_id = c.id
+        LEFT JOIN users u_prof ON r.reviewed_by = u_prof.id
+        WHERE c.professor_id = ?
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT 1
+        """,
+        (professor_id,)
+    )
+
+    return cursor.fetchone()

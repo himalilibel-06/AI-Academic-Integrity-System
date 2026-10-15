@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   getStudentEnrolledCourses,
@@ -9,56 +9,17 @@ import {
 } from "../service/api";
 
 const icons = {
-  dashboard: (p) => (
+  researchAreas: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
-      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
-      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
-      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
-    </svg>
-  ),
-  courses: (p) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" strokeLinejoin="round" />
-      <path d="M8 7h8M8 11h5" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
+      <path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" strokeLinecap="round" />
     </svg>
   ),
   upload: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
       <path d="M12 16V4M12 4l-4 4M12 4l4 4" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
-  submissions: (p) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5a1.5 1.5 0 0 1 1.5-1.5Z" strokeLinejoin="round" />
-      <path d="M14 3.5V8h4" strokeLinejoin="round" />
-      <path d="M9 13h6M9 16.5h6" strokeLinecap="round" />
-    </svg>
-  ),
-  reports: (p) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <path d="M4 19V5a1.5 1.5 0 0 1 1.5-1.5h9L20 8v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19Z" strokeLinejoin="round" />
-      <path d="M8.5 12.5l2 2 4-4.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
-  profile: (p) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <circle cx="12" cy="8.5" r="3.5" />
-      <path d="M4.5 20a7.5 7.5 0 0 1 15 0" strokeLinecap="round" />
-    </svg>
-  ),
-  settings: (p) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 13a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H4a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 5.6 8.6a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H10a1.65 1.65 0 0 0 1-1.51V2a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V8a1.65 1.65 0 0 0 1.51 1H20a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
-  logout: (p) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
   search: (p) => (
@@ -82,27 +43,94 @@ const icons = {
       <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
-  menu: (p) => (
+  info: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" strokeLinecap="round" />
+      <line x1="12" y1="8" x2="12.01" y2="8" strokeLinecap="round" />
     </svg>
   ),
-  close: (p) => (
+  book: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
-      <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" strokeLinejoin="round" />
     </svg>
   ),
 };
 
-const navItems = [
-  { label: "Dashboard", icon: icons.dashboard, to: "/student/dashboard" },
-  { label: "Courses", icon: icons.courses, to: "/student/courses" },
-  { label: "Upload Submission", icon: icons.upload, to: "/student/upload" },
-  { label: "My Submissions", icon: icons.submissions, to: "/student/submissions" },
-  { label: "Reports", icon: icons.reports, to: "/student/reports" },
-  { label: "Profile", icon: icons.profile, to: "/student/profile" },
-  { label: "Settings", icon: icons.settings, to: "/student/settings" },
+export const RESEARCH_CATEGORIES = [
+  "All Categories",
+  "Artificial Intelligence and Machine Learning",
+  "Natural Language Processing",
+  "Computer Vision",
+  "Data Science and Analytics",
+  "Cybersecurity",
+  "Software Engineering",
+  "Other Research Areas",
 ];
+
+export function determineResearchCategory(area) {
+  const text = `${area.name || ""} ${area.code || ""} ${area.description || ""}`.toLowerCase();
+  if (
+    text.includes("vision") ||
+    text.includes("image") ||
+    text.includes("robotics") ||
+    text.includes("spatial") ||
+    text.includes("agricultural")
+  ) {
+    return "Computer Vision";
+  }
+  if (
+    text.includes("language") ||
+    text.includes("nlp") ||
+    text.includes("semantic") ||
+    text.includes("text") ||
+    text.includes("retrieval") ||
+    text.includes("parsing")
+  ) {
+    return "Natural Language Processing";
+  }
+  if (
+    text.includes("artificial intelligence") ||
+    text.includes("machine learning") ||
+    text.includes("deep learning") ||
+    text.includes("reinforcement") ||
+    text.includes("neural") ||
+    text.includes("ai")
+  ) {
+    return "Artificial Intelligence and Machine Learning";
+  }
+  if (
+    text.includes("security") ||
+    text.includes("privacy") ||
+    text.includes("cyber") ||
+    text.includes("ethics") ||
+    text.includes("crypt")
+  ) {
+    return "Cybersecurity";
+  }
+  if (
+    text.includes("data") ||
+    text.includes("analytics") ||
+    text.includes("database") ||
+    text.includes("sql") ||
+    text.includes("statist")
+  ) {
+    return "Data Science and Analytics";
+  }
+  if (
+    text.includes("software") ||
+    text.includes("network") ||
+    text.includes("distributed") ||
+    text.includes("system") ||
+    text.includes("cloud") ||
+    text.includes("algorithm") ||
+    text.includes("comput")
+  ) {
+    return "Software Engineering";
+  }
+  return "Other Research Areas";
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return "Recently";
@@ -120,36 +148,27 @@ function formatDate(dateStr) {
 }
 
 export default function StudentCourses() {
-  const { user, logout } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Data states
-  const [enrolledCourses, setEnrolledCourses] = useState([]);
-  const [catalogCourses, setCatalogCourses] = useState([]);
+  const [enrolledAreas, setEnrolledAreas] = useState([]);
+  const [catalogAreas, setCatalogAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
-  // Tabs: 'enrolled' | 'browse'
-  const [activeTab, setActiveTab] = useState("enrolled");
+  // Tabs: 'myAreas' | 'explore'
+  const [activeTab, setActiveTab] = useState("myAreas");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
 
   // Action states
-  const [enrollingId, setEnrollingId] = useState(null);
-  const [droppingCourse, setDroppingCourse] = useState(null);
-  const [isDropping, setIsDropping] = useState(false);
+  const [joiningId, setJoiningId] = useState(null);
+  const [leavingArea, setLeavingArea] = useState(null);
+  const [isLeaving, setIsLeaving] = useState(false);
 
-  const initials = user?.name
-    ? user.name
-        .split(" ")
-        .filter(Boolean)
-        .map((p) => p[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "ST";
-
-  // Load enrolled courses and catalog courses
+  // Load registered research areas and catalog areas
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -159,10 +178,10 @@ export default function StudentCourses() {
         getCourses(),
       ]);
 
-      setEnrolledCourses(enrolledRes?.courses || []);
-      setCatalogCourses(catalogRes?.courses || []);
+      setEnrolledAreas(enrolledRes?.courses || []);
+      setCatalogAreas(catalogRes?.courses || []);
     } catch (err) {
-      setError(err.message || "Failed to load course information.");
+      setError(err.message || "Failed to load research area information.");
     } finally {
       setLoading(false);
     }
@@ -172,85 +191,106 @@ export default function StudentCourses() {
     loadData();
   }, []);
 
-  // Quick lookup set of enrolled course IDs
-  const enrolledCourseIds = new Set(enrolledCourses.map((c) => c.id));
+  // Quick lookup set of joined research area IDs
+  const joinedAreaIds = useMemo(() => new Set(enrolledAreas.map((a) => a.id)), [enrolledAreas]);
 
-  // Handle Enroll
-  const handleEnroll = async (course) => {
-    setEnrollingId(course.id);
+  // Handle Join Research Area
+  const handleJoin = async (area) => {
+    setJoiningId(area.id);
     setError(null);
     setSuccessMessage(null);
     try {
-      await enrollInCourse(course.id);
-      setSuccessMessage(`Successfully enrolled in ${course.code} - ${course.name}!`);
+      await enrollInCourse(area.id);
+      setSuccessMessage(`Successfully joined research area ${area.code} - ${area.name}!`);
       await loadData();
     } catch (err) {
-      setError(err.message || `Failed to enroll in ${course.code}.`);
+      setError(err.message || `Failed to join research area ${area.code}.`);
     } finally {
-      setEnrollingId(null);
+      setJoiningId(null);
     }
   };
 
-  // Handle Drop Confirmation
-  const confirmDrop = async () => {
-    if (!droppingCourse) return;
-    setIsDropping(true);
+  // Handle Leave / Disassociate Confirmation
+  const confirmLeave = async () => {
+    if (!leavingArea) return;
+    setIsLeaving(true);
     setError(null);
     setSuccessMessage(null);
     try {
-      await dropCourse(droppingCourse.id);
-      setSuccessMessage(`Successfully dropped course ${droppingCourse.code} - ${droppingCourse.name}.`);
-      setDroppingCourse(null);
+      await dropCourse(leavingArea.id);
+      setSuccessMessage(`Disassociated from research area ${leavingArea.code} - ${leavingArea.name}.`);
+      setLeavingArea(null);
       await loadData();
     } catch (err) {
-      setError(err.message || `Failed to drop ${droppingCourse.code}.`);
+      setError(err.message || `Failed to leave ${leavingArea.code}.`);
     } finally {
-      setIsDropping(false);
+      setIsLeaving(false);
     }
   };
 
-  // Filter catalog courses
-  const filteredCatalog = catalogCourses.filter((c) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      c.code?.toLowerCase().includes(q) ||
-      c.name?.toLowerCase().includes(q) ||
-      c.description?.toLowerCase().includes(q)
-    );
-  });
+  // Filter helper
+  const filterList = (list) => {
+    return list.filter((a) => {
+      // Category filter
+      if (selectedCategory !== "All Categories") {
+        const itemCat = determineResearchCategory(a);
+        if (itemCat !== selectedCategory) return false;
+      }
+
+      // Search query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const codeMatch = a.code?.toLowerCase().includes(q);
+        const nameMatch = a.name?.toLowerCase().includes(q);
+        const descMatch = a.description?.toLowerCase().includes(q);
+        const profMatch = a.professor_name?.toLowerCase().includes(q);
+        if (!codeMatch && !nameMatch && !descMatch && !profMatch) return false;
+      }
+
+      return true;
+    });
+  };
+
+  const filteredMyAreas = useMemo(() => filterList(enrolledAreas), [enrolledAreas, selectedCategory, searchQuery]);
+  const filteredCatalogAreas = useMemo(() => filterList(catalogAreas), [catalogAreas, selectedCategory, searchQuery]);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-slate-50 text-slate-900 font-sans">
+    <div className="flex-1 min-w-0 flex flex-col bg-slate-50 text-slate-900 font-sans min-h-screen">
       <div className="flex-1 min-w-0">
         {/* Top desktop header */}
-        <header className="hidden lg:flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
+        <header className="hidden lg:flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4 shadow-xs sticky top-0 z-30">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">Course Management</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Manage your enrolled courses or browse institutional offerings to enroll.
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">Research Areas</h1>
+              <span className="rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 text-xs font-semibold">
+                Scholar Domains
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Manage your research areas and organise plagiarism checks for your academic work.
             </p>
           </div>
+
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center">
-              {initials}
-            </div>
-            <div className="text-sm">
-              <p className="font-medium text-slate-900 leading-tight">{user?.name || "Student"}</p>
-              <p className="text-slate-500 leading-tight">{user?.email}</p>
-            </div>
+            <Link
+              to="/student/upload"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition shadow-sm"
+            >
+              {icons.upload({ className: "h-3.5 w-3.5" })}
+              Check Document
+            </Link>
           </div>
         </header>
 
-        <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8 space-y-6">
+        <main className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
           {/* Notifications */}
           {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center justify-between">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-700 flex items-center justify-between shadow-xs">
               <span>{error}</span>
               <button
                 type="button"
                 onClick={() => setError(null)}
-                className="text-red-500 hover:text-red-700 ml-4 font-semibold"
+                className="text-red-500 hover:text-red-700 ml-4 font-bold"
               >
                 Dismiss
               </button>
@@ -258,79 +298,129 @@ export default function StudentCourses() {
           )}
 
           {successMessage && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-center justify-between">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-800 flex items-center justify-between shadow-xs">
               <span>{successMessage}</span>
               <button
                 type="button"
                 onClick={() => setSuccessMessage(null)}
-                className="text-emerald-600 hover:text-emerald-800 ml-4 font-semibold"
+                className="text-emerald-600 hover:text-emerald-800 ml-4 font-bold"
               >
                 Dismiss
               </button>
             </div>
           )}
 
-          {/* Tab navigation */}
+          {/* Research Scholar Context Alert */}
+          <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/70 via-slate-50 to-white p-5 text-xs text-slate-700 shadow-xs flex items-start gap-3.5">
+            <div className="h-8 w-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+              {icons.info({ className: "h-4.5 w-4.5" })}
+            </div>
+            <div className="space-y-1 leading-relaxed">
+              <h4 className="font-bold uppercase tracking-wider text-blue-900 text-[11px]">
+                Research Scholar Workflow
+              </h4>
+              <p>
+                Research areas organize your manuscripts and doctoral or scholarly investigations. Unlike ordinary undergraduate courses, research areas categorize academic papers to ensure focused similarity analysis and peer comparison within your discipline.
+              </p>
+            </div>
+          </div>
+
+          {/* Research Categories Filter Bar */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Filter by Research Category:
+              </span>
+              {selectedCategory !== "All Categories" && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory("All Categories")}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                >
+                  Reset Category
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {RESEARCH_CATEGORIES.map((cat) => {
+                const isSelected = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      isSelected
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tab Navigation & Search Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setActiveTab("enrolled")}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === "enrolled"
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                onClick={() => setActiveTab("myAreas")}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === "myAreas"
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-900/20"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 font-semibold"
                 }`}
               >
-                <span>My Enrolled Courses</span>
+                <span>My Research Areas</span>
                 <span
-                  className={`inline-flex items-center justify-center px-2 py-0.5 text-xs rounded-full font-semibold ${
-                    activeTab === "enrolled"
-                      ? "bg-emerald-500 text-white"
+                  className={`inline-flex items-center justify-center px-2 py-0.5 text-[11px] rounded-full font-bold ${
+                    activeTab === "myAreas"
+                      ? "bg-white/20 text-white"
                       : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {enrolledCourses.length}
+                  {enrolledAreas.length}
                 </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setActiveTab("browse")}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === "browse"
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                onClick={() => setActiveTab("explore")}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === "explore"
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-900/20"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 font-semibold"
                 }`}
               >
-                <span>Browse Catalog</span>
+                <span>Explore Research Areas</span>
                 <span
-                  className={`inline-flex items-center justify-center px-2 py-0.5 text-xs rounded-full font-semibold ${
-                    activeTab === "browse"
-                      ? "bg-emerald-500 text-white"
+                  className={`inline-flex items-center justify-center px-2 py-0.5 text-[11px] rounded-full font-bold ${
+                    activeTab === "explore"
+                      ? "bg-white/20 text-white"
                       : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {catalogCourses.length}
+                  {catalogAreas.length}
                 </span>
               </button>
             </div>
 
-            {/* Browse Search Input */}
-            {activeTab === "browse" && (
-              <div className="relative max-w-xs w-full">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                  {icons.search({ className: "h-4 w-4" })}
-                </div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search course code or name..."
-                  className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
-                />
+            {/* Search Input */}
+            <div className="relative max-w-xs w-full">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                {icons.search({ className: "h-4 w-4" })}
               </div>
-            )}
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search area code, title, or topic..."
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
           </div>
 
           {/* Loading Skeleton */}
@@ -339,7 +429,7 @@ export default function StudentCourses() {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-xl border border-slate-200 p-6 animate-pulse space-y-4"
+                  className="bg-white rounded-2xl border border-slate-200 p-6 animate-pulse space-y-4"
                 >
                   <div className="h-5 bg-slate-200 rounded w-1/3" />
                   <div className="h-6 bg-slate-200 rounded w-3/4" />
@@ -350,184 +440,220 @@ export default function StudentCourses() {
             </div>
           )}
 
-          {/* Tab 1: My Enrolled Courses */}
-          {!loading && activeTab === "enrolled" && (
+          {/* Tab 1: My Research Areas */}
+          {!loading && activeTab === "myAreas" && (
             <div>
-              {enrolledCourses.length === 0 ? (
+              {enrolledAreas.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-                  <div className="mx-auto w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-4">
-                    {icons.courses({ className: "h-6 w-6" })}
+                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4">
+                    {icons.researchAreas({ className: "h-6 w-6" })}
                   </div>
-                  <h3 className="text-base font-semibold text-slate-900">No Enrolled Courses</h3>
-                  <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
-                    You have not enrolled in any academic courses yet. Browse the course catalog to enroll and submit assignments.
+                  <h3 className="text-sm font-bold text-slate-900">No Research Areas Yet</h3>
+                  <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                    Create or join a research area to organise your academic documents and plagiarism checks.
+                  </p>
+                  <p className="mt-2 text-[11px] text-slate-400 max-w-sm mx-auto">
+                    Institutional research areas are established by departmental research supervisors and faculty. You can join any available research area to associate your manuscripts.
                   </p>
                   <button
                     type="button"
-                    onClick={() => setActiveTab("browse")}
-                    className="mt-6 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+                    onClick={() => setActiveTab("explore")}
+                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
                   >
                     {icons.plus({ className: "h-4 w-4" })}
-                    Browse Course Catalog
+                    Explore Available Research Areas
+                  </button>
+                </div>
+              ) : filteredMyAreas.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+                  <p className="text-xs text-slate-500">
+                    No joined research areas match the category &ldquo;{selectedCategory}&rdquo;
+                    {searchQuery ? ` or query "${searchQuery}"` : ""}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory("All Categories");
+                      setSearchQuery("");
+                    }}
+                    className="mt-3 text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Clear Filters
                   </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {enrolledCourses.map((c) => (
-                    <div
-                      key={c.id}
-                      className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between hover:border-slate-300 transition"
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {c.code}
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            Enrolled {formatDate(c.enrolled_at)}
-                          </span>
-                        </div>
+                  {filteredMyAreas.map((area) => {
+                    const category = determineResearchCategory(area);
 
-                        <h3 className="text-lg font-semibold text-slate-900 mt-3 leading-snug">
-                          {c.name}
-                        </h3>
-
-                        <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-                          {c.description || "No description provided."}
-                        </p>
-
-                        <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-xs text-slate-600">
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-400">Instructor:</span>
-                            <span className="font-medium text-slate-800 truncate max-w-[180px]">
-                              {c.professor_name || "Faculty Instructor"}
+                    return (
+                      <div
+                        key={area.id}
+                        className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 flex flex-col justify-between hover:border-blue-300 hover:shadow-sm transition"
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/80 font-mono">
+                              {area.code}
+                            </span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                              {category}
                             </span>
                           </div>
-                          {c.professor_email && (
+
+                          <h3 className="text-base font-bold text-slate-900 mt-3 leading-snug">
+                            {area.name}
+                          </h3>
+
+                          <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                            {area.description || "Active departmental research domain for scholarly investigation and integrity analysis."}
+                          </p>
+
+                          <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-xs text-slate-600">
                             <div className="flex items-center justify-between">
-                              <span className="text-slate-400">Email:</span>
-                              <span className="text-slate-600 truncate max-w-[180px]">
-                                {c.professor_email}
+                              <span className="text-slate-400">Research Lead:</span>
+                              <span className="font-semibold text-slate-800 truncate max-w-[180px]">
+                                {area.professor_name || "Faculty Advisor"}
                               </span>
                             </div>
-                          )}
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-400">Submissions:</span>
-                            <span className="font-semibold text-emerald-600">
-                              {c.submission_count} submitted
-                            </span>
+                            {area.professor_email && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-slate-400">Contact:</span>
+                                <span className="text-slate-600 truncate max-w-[180px]">
+                                  {area.professor_email}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">Analyses:</span>
+                              <span className="font-bold text-blue-600">
+                                {area.submission_count} document(s) checked
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-                        <Link
-                          to="/student/upload"
-                          className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700"
-                        >
-                          {icons.upload({ className: "h-3.5 w-3.5" })}
-                          Upload Work
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => setDroppingCourse(c)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 transition"
-                        >
-                          {icons.trash({ className: "h-3.5 w-3.5" })}
-                          Drop Course
-                        </button>
+                        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                          <Link
+                            to={`/student/upload?area=${area.id}`}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800"
+                          >
+                            {icons.upload({ className: "h-3.5 w-3.5" })}
+                            Check Document
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => setLeavingArea(area)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
+                          >
+                            {icons.trash({ className: "h-3.5 w-3.5" })}
+                            Leave Area
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* Tab 2: Browse Catalog */}
-          {!loading && activeTab === "browse" && (
+          {/* Tab 2: Explore Research Areas */}
+          {!loading && activeTab === "explore" && (
             <div>
-              {filteredCatalog.length === 0 ? (
+              {catalogAreas.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
                   <div className="mx-auto w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mb-4">
                     {icons.search({ className: "h-6 w-6" })}
                   </div>
-                  <h3 className="text-base font-semibold text-slate-900">No Courses Found</h3>
-                  <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
-                    {searchQuery
-                      ? `No courses matched your search for "${searchQuery}".`
-                      : "There are currently no courses available in the catalog."}
+                  <h3 className="text-sm font-bold text-slate-900">No Institutional Research Areas Found</h3>
+                  <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    No research areas have been configured in the institution yet. Contact your department advisor or research supervisor to establish research areas.
                   </p>
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="mt-4 text-xs font-semibold text-emerald-600 hover:underline"
-                    >
-                      Clear search filter
-                    </button>
-                  )}
+                </div>
+              ) : filteredCatalogAreas.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+                  <p className="text-xs text-slate-500">
+                    No institutional research areas match the category &ldquo;{selectedCategory}&rdquo;
+                    {searchQuery ? ` or query "${searchQuery}"` : ""}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory("All Categories");
+                      setSearchQuery("");
+                    }}
+                    className="mt-3 text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Clear Filters
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {filteredCatalog.map((c) => {
-                    const isEnrolled = enrolledCourseIds.has(c.id);
-                    const isSubmitting = enrollingId === c.id;
+                  {filteredCatalogAreas.map((area) => {
+                    const isJoined = joinedAreaIds.has(area.id);
+                    const isSubmitting = joiningId === area.id;
+                    const category = determineResearchCategory(area);
 
                     return (
                       <div
-                        key={c.id}
-                        className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between hover:border-slate-300 transition"
+                        key={area.id}
+                        className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 flex flex-col justify-between hover:border-blue-300 hover:shadow-sm transition"
                       >
                         <div>
                           <div className="flex items-start justify-between gap-3">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                              {c.code}
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 font-mono">
+                              {area.code}
                             </span>
-                            {isEnrolled ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                {icons.check({ className: "h-3 w-3" })}
-                                Enrolled
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                                {category}
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
-                                Available
-                              </span>
-                            )}
+                              {isJoined ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {icons.check({ className: "h-3 w-3" })}
+                                  Joined
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+                                  Available
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          <h3 className="text-lg font-semibold text-slate-900 mt-3 leading-snug">
-                            {c.name}
+                          <h3 className="text-base font-bold text-slate-900 mt-3 leading-snug">
+                            {area.name}
                           </h3>
 
-                          <p className="text-xs text-slate-500 mt-2 line-clamp-3">
-                            {c.description || "Comprehensive academic syllabus and learning objectives."}
+                          <p className="text-xs text-slate-500 mt-2 line-clamp-3 leading-relaxed">
+                            {area.description || "Departmental research discipline focused on scholarly investigation, peer analysis, and integrity verification."}
                           </p>
                         </div>
 
                         <div className="mt-6 pt-4 border-t border-slate-100">
-                          {isEnrolled ? (
+                          {isJoined ? (
                             <button
                               type="button"
                               disabled
-                              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-400 cursor-default"
+                              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-400 cursor-default"
                             >
-                              {icons.check({ className: "h-3.5 w-3.5 text-emerald-500" })}
-                              Already Enrolled
+                              {icons.check({ className: "h-3.5 w-3.5 text-emerald-600" })}
+                              Already Associated
                             </button>
                           ) : (
                             <button
                               type="button"
                               disabled={isSubmitting}
-                              onClick={() => handleEnroll(c)}
-                              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition disabled:opacity-50"
+                              onClick={() => handleJoin(area)}
+                              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition disabled:opacity-50"
                             >
                               {isSubmitting ? (
-                                <span>Enrolling...</span>
+                                <span>Joining...</span>
                               ) : (
                                 <>
                                   {icons.plus({ className: "h-3.5 w-3.5" })}
-                                  Enroll in Course
+                                  Join Research Area
                                 </>
                               )}
                             </button>
@@ -543,40 +669,40 @@ export default function StudentCourses() {
         </main>
       </div>
 
-      {/* Confirmation Modal for Dropping Course */}
-      {droppingCourse && (
+      {/* Confirmation Modal for Leaving Research Area */}
+      {leavingArea && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
             <div className="w-10 h-10 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
               {icons.trash({ className: "h-5 w-5" })}
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Drop Course</h3>
+              <h3 className="text-lg font-semibold text-slate-900">Leave Research Area</h3>
               <p className="mt-1 text-sm text-slate-500">
-                Are you sure you want to drop{" "}
+                Are you sure you want to disassociate from{" "}
                 <span className="font-semibold text-slate-800">
-                  {droppingCourse.code} - {droppingCourse.name}
+                  {leavingArea.code} - {leavingArea.name}
                 </span>
-                ? You will not be able to submit new assignments for this course unless you re-enroll.
+                ? You can rejoin this research area at any time from the Explore tab.
               </p>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
-                disabled={isDropping}
-                onClick={() => setDroppingCourse(null)}
+                disabled={isLeaving}
+                onClick={() => setLeavingArea(null)}
                 className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={isDropping}
-                onClick={confirmDrop}
+                disabled={isLeaving}
+                onClick={confirmLeave}
                 className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition disabled:opacity-50"
               >
-                {isDropping ? "Dropping..." : "Confirm Drop"}
+                {isLeaving ? "Disassociating..." : "Confirm"}
               </button>
             </div>
           </div>

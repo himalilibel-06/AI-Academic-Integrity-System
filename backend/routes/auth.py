@@ -65,12 +65,13 @@ class RegisterRequest(BaseModel):
     name: str
     email: str
     password: str
-    role: str
+    role: Optional[str] = "student"
 
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+    role: Optional[str] = None
 
 
 class UpdateProfileRequest(BaseModel):
@@ -115,7 +116,15 @@ def register_user(data: RegisterRequest):
             detail="Password must contain at least 6 characters"
         )
 
-    if data.role not in ["student", "professor"]:
+    # Disallow unauthorized public registration of professor accounts
+    assigned_role = (data.role or "student").strip().lower()
+    if assigned_role == "professor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public registration for professor accounts is disabled. Only user accounts can be registered."
+        )
+
+    if assigned_role not in ["student", "user"]:
         raise HTTPException(
             status_code=400,
             detail="Invalid role"
@@ -136,14 +145,30 @@ def register_user(data: RegisterRequest):
                 detail="An account with this email already exists."
             )
 
+        # Standard normal users are stored with role 'student' for full compatibility
+        db_role = "student"
+
         # Create user
         user_id = create_user(
             connection,
             data.name.strip(),
             data.email.strip().lower(),
             data.password,
-            data.role
+            db_role
         )
+
+        # Auto-enroll new user into available default courses so they can submit immediately
+        try:
+            from models.course import enroll_student
+            cursor = connection.cursor()
+            cursor.execute("SELECT id FROM courses")
+            for (c_id,) in cursor.fetchall():
+                try:
+                    enroll_student(connection, c_id, user_id)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         return {
             "success": True,
@@ -159,6 +184,7 @@ def register_user(data: RegisterRequest):
 def login_user(data: LoginRequest):
     """
     Authenticate user with email and password, returning JWT access token.
+    Enforces verified database role as source of truth and prevents role elevation.
     """
 
     email_clean = data.email.strip().lower()
@@ -193,6 +219,19 @@ def login_user(data: LoginRequest):
                 detail="Invalid email or password"
             )
 
+        # If a portal role was specified, verify it matches the user's actual database role
+        if data.role and data.role.strip():
+            requested_role = data.role.strip().lower()
+            actual_role = (user["role"] or "").strip().lower()
+            if requested_role != actual_role:
+                portal_label = "Professor" if requested_role == "professor" else "Student"
+                actual_label = "Professor" if actual_role == "professor" else "Student"
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Your account is registered as a {actual_label}. You cannot log in through the {portal_label} portal."
+                )
+
+        # Always issue token strictly based on verified database role
         token_data = {
             "sub": str(user["id"]),
             "email": user["email"],

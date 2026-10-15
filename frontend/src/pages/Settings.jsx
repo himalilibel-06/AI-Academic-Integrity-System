@@ -6,6 +6,7 @@ import {
   saveUserPreferences,
   changePassword,
 } from "../service/api";
+import ProfessorSidebar from "../components/ProfessorSidebar";
 
 const CATEGORIES = [
   { id: "general", label: "General" },
@@ -23,8 +24,8 @@ function Toggle({ id, checked, onChange, label }) {
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
-        checked ? "bg-emerald-500" : "bg-slate-300"
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+        checked ? "bg-blue-600" : "bg-slate-300"
       }`}
     >
       <span
@@ -394,94 +395,7 @@ export default function Settings() {
 
       {/* Sidebar for Professor */}
       {isProfessor && (
-        <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:flex-shrink-0 lg:min-h-screen ${
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
-        >
-          <div className="px-6 py-6 border-b border-white/10 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 4.5L3 8.25l9 3.75 9-3.75-9-3.75zM3 8.25v7.5l9 3.75m0-11.25l9 3.75m-9-3.75v11.25m9-11.25v7.5l-9 3.75"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium leading-tight">
-                  Academic Integrity
-                </p>
-                <p className="text-xs text-slate-400 leading-tight">
-                  {isProfessor ? "Professor Portal" : "Student Portal"}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
-              aria-label="Close navigation menu"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-
-          <nav className="px-3 py-4" aria-label="Portal navigation">
-            <ul className="space-y-1">
-              {navItems.map((item) => {
-                const isActive = item.label === "Settings";
-                return (
-                  <li key={item.label}>
-                    <Link
-                      to={item.to}
-                      className={`block rounded-lg px-3.5 py-2.5 text-sm transition ${
-                        isActive
-                          ? "bg-white/10 text-white font-medium border border-white/20"
-                          : "text-slate-300 hover:bg-white/5 hover:text-white"
-                      }`}
-                      aria-current={isActive ? "page" : undefined}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-
-          <div className="px-3 py-4 mt-auto border-t border-white/10">
-            <button
-              type="button"
-              onClick={logout}
-              className="w-full text-left rounded-lg px-3.5 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition"
-            >
-              Sign Out
-            </button>
-          </div>
-        </aside>
+        <ProfessorSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       )}
 
       {/* Main content */}
@@ -490,7 +404,7 @@ export default function Settings() {
           <nav aria-label="Breadcrumb" className="mb-3">
             <ol className="flex items-center gap-2 text-sm text-slate-500">
               <li>
-                <Link to={dashboardHref} className="hover:text-emerald-600">
+                <Link to={dashboardHref} className="hover:text-blue-600">
                   Dashboard
                 </Link>
               </li>
@@ -510,7 +424,7 @@ export default function Settings() {
 
           {loading ? (
             <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-r-transparent" />
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent" />
               <p className="mt-3 text-sm text-slate-600">Loading settings...</p>
             </div>
           ) : (
@@ -525,9 +439,9 @@ export default function Settings() {
                         <button
                           type="button"
                           onClick={() => setActiveCategory(cat.id)}
-                          className={`w-full text-left rounded-lg px-3.5 py-2.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                          className={`w-full text-left rounded-lg px-3.5 py-2.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                             isActive
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              ? "bg-blue-50 text-blue-700 border border-blue-200"
                               : "text-slate-600 hover:bg-white border border-transparent"
                           }`}
                           aria-current={isActive ? "true" : undefined}
@@ -560,7 +474,7 @@ export default function Settings() {
                           id="language"
                           value={language}
                           onChange={(e) => setLanguage(e.target.value)}
-                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="English">English</option>
                           <option value="Tamil">Tamil</option>
@@ -580,7 +494,7 @@ export default function Settings() {
                           id="timeZone"
                           value={timeZone}
                           onChange={(e) => setTimeZone(e.target.value)}
-                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="India Standard Time (IST)">
                             India Standard Time (IST)
@@ -603,7 +517,7 @@ export default function Settings() {
                           id="dateFormat"
                           value={dateFormat}
                           onChange={(e) => setDateFormat(e.target.value)}
-                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                           <option value="MM/DD/YYYY">MM/DD/YYYY</option>
@@ -615,7 +529,7 @@ export default function Settings() {
                         <button
                           type="submit"
                           disabled={savingGeneral}
-                          className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
+                          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                         >
                           {savingGeneral ? "Saving..." : "Save Preferences"}
                         </button>
@@ -733,7 +647,7 @@ export default function Settings() {
                         <button
                           type="submit"
                           disabled={savingNotifications}
-                          className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
+                          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                         >
                           {savingNotifications ? "Saving..." : "Save Notification Settings"}
                         </button>
@@ -762,7 +676,7 @@ export default function Settings() {
                           id="profileVisibility"
                           value={profileVisibility}
                           onChange={(e) => setProfileVisibility(e.target.value)}
-                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="Private">Private</option>
                           <option value="Institution Only">
@@ -802,7 +716,7 @@ export default function Settings() {
                           id="reportVisibility"
                           value={reportVisibility}
                           onChange={(e) => setReportVisibility(e.target.value)}
-                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="Student and Professor">
                             Student and Professor
@@ -811,8 +725,8 @@ export default function Settings() {
                         </select>
                       </div>
 
-                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
-                        <p className="text-sm text-emerald-900">
+                      <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                        <p className="text-sm text-blue-950">
                           Privacy settings control how your academic information is displayed within the platform.
                         </p>
                       </div>
@@ -821,7 +735,7 @@ export default function Settings() {
                         <button
                           type="submit"
                           disabled={savingPrivacy}
-                          className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
+                          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                         >
                           {savingPrivacy ? "Saving..." : "Save Privacy Settings"}
                         </button>
@@ -851,7 +765,7 @@ export default function Settings() {
                         <button
                           type="button"
                           onClick={openPasswordModal}
-                          className="flex-shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                          className="flex-shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         >
                           Change Password
                         </button>
@@ -900,7 +814,7 @@ export default function Settings() {
                           <button
                             type="button"
                             onClick={handleSignOutOtherSessions}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                           >
                             Refresh Session
                           </button>
@@ -973,7 +887,7 @@ export default function Settings() {
                   type="password"
                   value={passwordForm.currentPassword}
                   onChange={handlePasswordFieldChange}
-                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
+                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                     passwordErrors.currentPassword
                       ? "border-red-400"
                       : "border-slate-300"
@@ -1000,7 +914,7 @@ export default function Settings() {
                   type="password"
                   value={passwordForm.newPassword}
                   onChange={handlePasswordFieldChange}
-                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
+                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                     passwordErrors.newPassword
                       ? "border-red-400"
                       : "border-slate-300"
@@ -1027,7 +941,7 @@ export default function Settings() {
                   type="password"
                   value={passwordForm.confirmPassword}
                   onChange={handlePasswordFieldChange}
-                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
+                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                     passwordErrors.confirmPassword
                       ? "border-red-400"
                       : "border-slate-300"
@@ -1046,14 +960,14 @@ export default function Settings() {
                   type="button"
                   onClick={closePasswordModal}
                   disabled={savingPassword}
-                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingPassword}
-                  className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
+                  className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                 >
                   {savingPassword ? "Updating..." : "Update Password"}
                 </button>

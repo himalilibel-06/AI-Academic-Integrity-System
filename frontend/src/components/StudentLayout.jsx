@@ -10,18 +10,15 @@ export default function StudentLayout({ children }) {
       {/* Mobile Top Header */}
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-[#0B1120] border-b border-slate-800 sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 via-indigo-600 to-emerald-400 p-0.5 shadow-sm">
-            <div className="w-full h-full bg-[#0B1120] rounded-[6px] flex items-center justify-center text-indigo-400 font-bold text-xs">
-              GG
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 p-0.5 shadow-sm">
+            <div className="w-full h-full bg-[#0B1120] rounded-[6px] flex items-center justify-center text-blue-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-bold text-white tracking-tight">GapGuard</span>
-              <span className="text-[10px] font-semibold px-1 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                AI
-              </span>
-            </div>
+            <span className="text-sm font-bold text-white tracking-tight">Plagiarism Detector</span>
           </div>
         </div>
         <button

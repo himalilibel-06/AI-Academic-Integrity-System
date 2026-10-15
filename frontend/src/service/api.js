@@ -33,6 +33,19 @@ export async function apiRequest(endpoint, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    if (response.status === 401) {
+      // Clear invalid/expired token
+      localStorage.removeItem("auth_token");
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login") &&
+        !window.location.pathname.startsWith("/register") &&
+        endpoint !== "/api/auth/login"
+      ) {
+        window.location.replace("/login");
+      }
+    }
+
     let errorMessage = data.detail || data.message || "An unexpected error occurred.";
     if (typeof errorMessage === "object" && errorMessage !== null) {
       if (Array.isArray(errorMessage)) {
@@ -276,7 +289,7 @@ export async function downloadSubmissionFile(submissionId, preferredFilename = n
 }
 
 /**
- * Export official academic integrity report in HTML or JSON format.
+ * Export official academic integrity report in HTML, PDF, or JSON format.
  */
 export async function exportPlagiarismReport(reportId, format = "html") {
   const token = localStorage.getItem("auth_token");
@@ -305,7 +318,8 @@ export async function exportPlagiarismReport(reportId, format = "html") {
     return await response.json();
   }
 
-  let filename = `Academic_Integrity_Report_${reportId}.html`;
+  let filename = `Academic_Integrity_Report_${reportId}.${format === "pdf" ? "pdf" : "html"}`;
+
   const disposition = response.headers.get("Content-Disposition");
   if (disposition && disposition.includes("filename=")) {
     const match = disposition.match(/filename=["']?([^"';]+)["']?/);
@@ -417,6 +431,45 @@ export async function getLiteraturePaper(paperId) {
     method: "GET",
   });
 }
+
+/**
+ * Retrieve custom reference papers added by the authenticated scholar.
+ */
+export async function getCustomReferences() {
+  return apiRequest("/api/references/custom", {
+    method: "GET",
+  });
+}
+
+/**
+ * Add a new custom reference paper (via multipart FormData).
+ */
+export async function addCustomReference(formData) {
+  return apiRequest("/api/references/custom", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+/**
+ * Delete a custom reference paper by ID.
+ */
+export async function deleteCustomReference(referenceId) {
+  return apiRequest(`/api/references/custom/${referenceId}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Update metadata (title, author, publication_year, research_field) of a custom reference paper.
+ */
+export async function updateCustomReference(referenceId, data) {
+  return apiRequest(`/api/references/custom/${referenceId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 
 /**
  * Search local literature corpus using free-text or structured research_information.
@@ -748,9 +801,3 @@ export async function registerManuscript(manuscriptData) {
 export async function getProjectManuscripts(projectId) {
   return apiRequest(`/api/faculty-review/manuscripts/${encodeURIComponent(projectId)}`);
 }
-
-
-
-
-
-

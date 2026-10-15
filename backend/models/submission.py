@@ -410,7 +410,7 @@ def get_historical_submissions_for_corpus(connection, exclude_submission_id=None
     cursor = connection.cursor()
 
     query = """
-        SELECT s.id, s.title, s.filename, s.course_id, s.processed_text
+        SELECT s.id, s.title, s.filename, s.course_id, s.original_text, s.processed_text
         FROM submissions s
         WHERE s.processed_text IS NOT NULL
           AND TRIM(s.processed_text) != ''
