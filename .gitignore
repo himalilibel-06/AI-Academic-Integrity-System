@@ -76,6 +76,8 @@ htmlcov/
 *.tmp
 *.temp
 *.bak
+scratch/
+audit_*.py
 
 # Uploaded documents
 backend/uploads/*

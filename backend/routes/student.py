@@ -120,8 +120,10 @@ def get_student_dashboard(payload: dict = Depends(get_current_user_payload)):
                 "id": row["id"],
                 "title": row["title"],
                 "filename": row["filename"],
-                "course": row["course_name"] or "General Course",
+                "course": row["course_name"] or "General Research",
                 "course_code": row["course_code"] or "",
+                "research_area": row["course_name"] or "General Research",
+                "research_area_code": row["course_code"] or "",
                 "status": display_status,
                 "raw_status": row["status"],
                 "similarity": (
@@ -194,8 +196,10 @@ def get_student_submissions(payload: dict = Depends(get_current_user_payload)):
                 "id": row["id"],
                 "title": row["title"],
                 "filename": row["filename"],
-                "course": row["course_name"] or "General Course",
+                "course": row["course_name"] or "General Research",
                 "course_code": row["course_code"] or "",
+                "research_area": row["course_name"] or "General Research",
+                "research_area_code": row["course_code"] or "",
                 "status": display_status,
                 "raw_status": row["status"],
                 "similarity": (
@@ -260,16 +264,29 @@ def get_student_enrolled_courses(payload: dict = Depends(get_current_user_payloa
                     "id": c["id"],
                     "code": c["code"],
                     "name": c["name"],
+                    "title": c["name"],
                     "description": c["description"] or "",
                     "professor_id": c["professor_id"],
-                    "professor_name": c["professor_name"] or "Faculty Instructor",
+                    "professor_name": c["professor_name"] or "Lead Researcher",
                     "professor_email": c["professor_email"] or "",
                     "enrolled_at": str(c["enrolled_at"]) if c["enrolled_at"] else None,
                     "submission_count": c["submission_count"] or 0,
                 }
                 for c in courses
             ],
-            "total_courses": len(courses)
+            "research_areas": [
+                {
+                    "id": c["id"],
+                    "code": c["code"],
+                    "name": c["name"],
+                    "title": c["name"],
+                    "description": c["description"] or "",
+                    "professor_name": c["professor_name"] or "Lead Researcher",
+                }
+                for c in courses
+            ],
+            "total_courses": len(courses),
+            "total_research_areas": len(courses)
         }
     finally:
         connection.close()

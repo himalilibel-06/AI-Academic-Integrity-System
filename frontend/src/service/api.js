@@ -19,15 +19,48 @@ export async function apiRequest(endpoint, options = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (networkErr) {
+    console.error(`Network error connecting to API (${endpoint}):`, networkErr);
+    throw new Error("Unable to connect to the server. Please make sure the backend is running.");
+  }
 
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const errorMessage = data.detail || data.message || "An unexpected error occurred.";
+    if (response.status === 401) {
+      // Clear invalid/expired token
+      localStorage.removeItem("auth_token");
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login") &&
+        !window.location.pathname.startsWith("/register") &&
+        endpoint !== "/api/auth/login"
+      ) {
+        window.location.replace("/login");
+      }
+    }
+
+    let errorMessage = data.detail || data.message || "An unexpected error occurred.";
+    if (typeof errorMessage === "object" && errorMessage !== null) {
+      if (Array.isArray(errorMessage)) {
+        errorMessage = errorMessage.map((e) => e.msg || JSON.stringify(e)).join(", ");
+      } else {
+        errorMessage = JSON.stringify(errorMessage);
+      }
+    }
+    if (
+      typeof errorMessage === "string" &&
+      (errorMessage.toLowerCase().includes("email already registered") ||
+        errorMessage.toLowerCase().includes("already exists"))
+    ) {
+      errorMessage = "An account with this email already exists.";
+    }
     throw new Error(errorMessage);
   }
 
@@ -256,7 +289,7 @@ export async function downloadSubmissionFile(submissionId, preferredFilename = n
 }
 
 /**
- * Export official academic integrity report in HTML or JSON format.
+ * Export official academic integrity report in HTML, PDF, or JSON format.
  */
 export async function exportPlagiarismReport(reportId, format = "html") {
   const token = localStorage.getItem("auth_token");
@@ -285,7 +318,8 @@ export async function exportPlagiarismReport(reportId, format = "html") {
     return await response.json();
   }
 
-  let filename = `Academic_Integrity_Report_${reportId}.html`;
+  let filename = `Academic_Integrity_Report_${reportId}.${format === "pdf" ? "pdf" : "html"}`;
+
   const disposition = response.headers.get("Content-Disposition");
   if (disposition && disposition.includes("filename=")) {
     const match = disposition.match(/filename=["']?([^"';]+)["']?/);
@@ -351,4 +385,419 @@ export async function removeStudentFromRoster(courseId, studentId) {
   });
 }
 
+/**
+ * Extract plain text from manuscript file (PDF, DOCX, TXT).
+ * Foundation step: File -> Text (No AI/analysis performed).
+ */
+export async function extractManuscriptText(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiRequest("/api/manuscripts/extract-text", {
+    method: "POST",
+    body: formData,
+  });
+}
 
+/**
+ * Extract structured academic research fields from manuscript plain text.
+ * Foundation step: Text -> Structured Research Information (No AI reasoning/validation).
+ */
+export async function extractResearchInfo({ text, file_name }) {
+  return apiRequest("/api/manuscripts/extract-research-info", {
+    method: "POST",
+    body: JSON.stringify({ text, file_name }),
+  });
+}
+
+/**
+ * Retrieve papers from the local development literature corpus.
+ */
+export async function getLiteratureCorpus(search = "", limit = 50, offset = 0) {
+  const params = new URLSearchParams();
+  if (search) params.append("search", search);
+  if (limit) params.append("limit", limit.toString());
+  if (offset) params.append("offset", offset.toString());
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/literature${queryString}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Retrieve a single paper record by its unique paper_id.
+ */
+export async function getLiteraturePaper(paperId) {
+  return apiRequest(`/api/literature/${encodeURIComponent(paperId)}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Retrieve custom reference papers added by the authenticated scholar.
+ */
+export async function getCustomReferences() {
+  return apiRequest("/api/references/custom", {
+    method: "GET",
+  });
+}
+
+/**
+ * Add a new custom reference paper (via multipart FormData).
+ */
+export async function addCustomReference(formData) {
+  return apiRequest("/api/references/custom", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+/**
+ * Delete a custom reference paper by ID.
+ */
+export async function deleteCustomReference(referenceId) {
+  return apiRequest(`/api/references/custom/${referenceId}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Update metadata (title, author, publication_year, research_field) of a custom reference paper.
+ */
+export async function updateCustomReference(referenceId, data) {
+  return apiRequest(`/api/references/custom/${referenceId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+
+/**
+ * Search local literature corpus using free-text or structured research_information.
+ * Foundation step: Retrieval & Evidence Ranking (No contradiction or validation claims).
+ */
+export async function searchLiterature({ query, research_information, top_k = 10 }) {
+  return apiRequest("/api/literature/search", {
+    method: "POST",
+    body: JSON.stringify({ query, research_information, top_k }),
+  });
+}
+
+/**
+ * Perform rule-based Research Gap Contradiction Analysis against local literature evidence.
+ * Phase 6 Reasoning Layer: Relates claimed research gap to retrieved corpus evidence.
+ */
+export async function analyzeResearchGap({ research_information, top_k = 10 }) {
+  return apiRequest("/api/gap-analysis/analyze", {
+    method: "POST",
+    body: JSON.stringify({ research_information, top_k }),
+  });
+}
+
+/**
+ * Perform 6-dimension Contribution Differentiation Analysis against local literature evidence.
+ * Phase 7 Reasoning Layer: Compares proposed contribution across 6 dimensions.
+ */
+export async function analyzeContributionDifferentiation({ research_information, top_k = 10 }) {
+  return apiRequest("/api/contribution-analysis/analyze", {
+    method: "POST",
+    body: JSON.stringify({ research_information, top_k }),
+  });
+}
+
+/**
+ * Retrieve or build the Research Knowledge Graph for a specific project.
+ * Phase 8 Reasoning Layer: Graph-based concept representation.
+ */
+export async function getProjectKnowledgeGraph(projectId, topK = 5) {
+  return apiRequest(`/api/knowledge-graph/${encodeURIComponent(projectId)}?top_k=${topK}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Build Knowledge Graph from dynamic research information.
+ */
+export async function buildKnowledgeGraph({ projectId, researchInformation, topK = 5 }) {
+  return apiRequest("/api/knowledge-graph/build", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      research_information: researchInformation,
+      top_k: topK,
+    }),
+  });
+}
+
+/**
+ * Execute AI graph search algorithm (BFS, DFS, Best-First Search).
+ */
+export async function searchKnowledgeGraph({
+  startNode,
+  goalNode,
+  algorithm = "bfs",
+  nodes = null,
+  edges = null,
+  projectId = null,
+  researchInformation = null,
+}) {
+  return apiRequest("/api/knowledge-graph/search", {
+    method: "POST",
+    body: JSON.stringify({
+      start_node: startNode,
+      goal_node: goalNode,
+      algorithm,
+      nodes,
+      edges,
+      project_id: projectId,
+      research_information: researchInformation,
+    }),
+  });
+}
+
+/**
+ * Execute Rule-Based and Bayesian Evidence Reasoning over research evidence.
+ * Phase 9 Reasoning Layer: production rules, forward chaining, backward chaining, Bayesian inference.
+ */
+export async function analyzeReasoning({
+  projectId = null,
+  researchInformation = null,
+  gapAnalysis = null,
+  contributionAnalysis = null,
+  prior = 0.5,
+  backwardChainingGoal = "GAP_SUPPORTED_BY_EVIDENCE",
+  topK = 5,
+} = {}) {
+  return apiRequest("/api/reasoning/analyze", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      research_information: researchInformation,
+      gap_analysis: gapAnalysis,
+      contribution_analysis: contributionAnalysis,
+      prior,
+      backward_chaining_goal: backwardChainingGoal,
+      top_k: topK,
+    }),
+  });
+}
+
+/**
+ * Perform Evidence Coverage Audit on research claims against local literature corpus.
+ * Phase 10A: Evaluates claim coverage (Supported, Partially Supported, Insufficient).
+ */
+export async function analyzeEvidenceCoverage({
+  projectId = null,
+  manuscriptId = null,
+  claims = null,
+  researchInformation = null,
+  topK = 5,
+} = {}) {
+  return apiRequest("/api/evidence-coverage/analyze", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      manuscript_id: manuscriptId,
+      claims,
+      research_information: researchInformation,
+      top_k: topK,
+    }),
+  });
+}
+
+/**
+ * Compare two manuscript versions belonging to the same research project.
+ * Phase 10A: Deterministic field-by-field diff, change summary, and revision guidance.
+ */
+export async function compareManuscriptRevisions({
+  projectId = null,
+  previousManuscriptId = null,
+  newManuscriptId = null,
+  previousProjectId = null,
+  newProjectId = null,
+  previousResearchInfo = null,
+  newResearchInfo = null,
+  previousVersionLabel = "Version 1",
+  newVersionLabel = "Version 2",
+} = {}) {
+  return apiRequest("/api/revision-comparison/compare", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      previous_manuscript_id: previousManuscriptId,
+      new_manuscript_id: newManuscriptId,
+      previous_project_id: previousProjectId || projectId,
+      new_project_id: newProjectId || projectId,
+      previous_research_info: previousResearchInfo,
+      new_research_info: newResearchInfo,
+      previous_version_label: previousVersionLabel,
+      new_version_label: newVersionLabel,
+    }),
+  });
+}
+
+/**
+ * Generate explainable Submission Readiness Report.
+ * Phase 10B: Aggregates existing gap, contribution, evidence, and revision analyses.
+ */
+export async function analyzeSubmissionReadiness({
+  projectId = null,
+  manuscriptId = null,
+  previousManuscriptId = null,
+  researchInformation = null,
+  previousResearchInfo = null,
+  claims = null,
+  gapAnalysis = null,
+  contributionAnalysis = null,
+  evidenceCoverage = null,
+  reasoningAnalysis = null,
+  revisionComparison = null,
+  topK = 5,
+} = {}) {
+  return apiRequest("/api/submission-readiness/analyze", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      manuscript_id: manuscriptId,
+      previous_manuscript_id: previousManuscriptId,
+      research_information: researchInformation,
+      previous_research_info: previousResearchInfo,
+      claims,
+      gap_analysis: gapAnalysis,
+      contribution_analysis: contributionAnalysis,
+      evidence_coverage: evidenceCoverage,
+      reasoning_analysis: reasoningAnalysis,
+      revision_comparison: revisionComparison,
+      top_k: topK,
+    }),
+  });
+}
+
+/**
+ * Start or retrieve active faculty review for a research project.
+ * Phase 11A: Faculty Review & Research Feedback.
+ */
+export async function createFacultyReview({
+  projectId,
+  reviewerName = null,
+  reviewerId = null,
+  studentId = null,
+  initialStatus = "In Review",
+}) {
+  return apiRequest("/api/faculty-review/create", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId,
+      reviewer_name: reviewerName,
+      reviewer_id: reviewerId,
+      student_id: studentId,
+      initial_status: initialStatus,
+    }),
+  });
+}
+
+/**
+ * Retrieve faculty review for a project by project ID.
+ */
+export async function getFacultyReview(projectId) {
+  return apiRequest(`/api/faculty-review/${encodeURIComponent(projectId)}`);
+}
+
+/**
+ * Save faculty feedback comments and overall recommendations.
+ */
+export async function saveFacultyFeedback({
+  reviewId,
+  comments = {},
+  recommendations = "",
+  reviewerName = null,
+}) {
+  return apiRequest(`/api/faculty-review/${encodeURIComponent(reviewId)}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      comments,
+      recommendations,
+      reviewer_name: reviewerName,
+    }),
+  });
+}
+
+/**
+ * Request manuscript revision with qualitative faculty guidance.
+ */
+export async function requestFacultyRevision({
+  reviewId,
+  comments = {},
+  recommendations = "",
+  reviewerName = null,
+}) {
+  return apiRequest(`/api/faculty-review/${encodeURIComponent(reviewId)}/request-revision`, {
+    method: "POST",
+    body: JSON.stringify({
+      comments,
+      recommendations,
+      reviewer_name: reviewerName,
+    }),
+  });
+}
+
+/**
+ * Mark faculty review as completed (status: 'Reviewed').
+ */
+export async function completeFacultyReview({
+  reviewId,
+  comments = {},
+  recommendations = "",
+  reviewerName = null,
+}) {
+  return apiRequest(`/api/faculty-review/${encodeURIComponent(reviewId)}/complete`, {
+    method: "POST",
+    body: JSON.stringify({
+      comments,
+      recommendations,
+      reviewer_name: reviewerName,
+    }),
+  });
+}
+
+/**
+ * Retrieve all research projects with faculty review statuses and metadata.
+ * Phase 11B: Faculty Review Dashboard.
+ */
+export async function getFacultyReviewProjects() {
+  return apiRequest("/api/faculty-review/projects");
+}
+
+/**
+ * Retrieve chronological faculty review history and revision cycles for a project.
+ * Phase 11C: Faculty Review History & Revision Cycle Tracking.
+ */
+export async function getFacultyReviewHistory(projectId) {
+  return apiRequest(`/api/faculty-review/history/${encodeURIComponent(projectId)}`);
+}
+
+/**
+ * Record a validated revision cycle connecting manuscript versions.
+ */
+export async function createReviewCycle(cycleData) {
+  return apiRequest("/api/faculty-review/history/create-cycle", {
+    method: "POST",
+    body: JSON.stringify(cycleData),
+  });
+}
+
+/**
+ * Register manuscript metadata on the backend database.
+ */
+export async function registerManuscript(manuscriptData) {
+  return apiRequest("/api/faculty-review/manuscripts/register", {
+    method: "POST",
+    body: JSON.stringify(manuscriptData),
+  });
+}
+
+/**
+ * Retrieve all registered manuscripts for a research project from the backend.
+ */
+export async function getProjectManuscripts(projectId) {
+  return apiRequest(`/api/faculty-review/manuscripts/${encodeURIComponent(projectId)}`);
+}

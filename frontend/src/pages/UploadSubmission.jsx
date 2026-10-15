@@ -1,7 +1,59 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { submitAssignment, getStudentEnrolledCourses } from "../service/api";
+import { submitAssignment, getCustomReferences } from "../service/api";
+
+const icons = {
+  upload: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M12 16V4M12 4l-4 4M12 4l4 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  fileDoc: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinejoin="round" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </svg>
+  ),
+  referenceDoc: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" strokeLinejoin="round" />
+      <path d="M9 7h6M9 11h4" strokeLinecap="round" />
+    </svg>
+  ),
+  close: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  arrowLeft: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  checkCircle: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M22 4L12 14.01l-3-3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  plus: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}>
+      <line x1="12" y1="5" x2="12" y2="19" strokeLinecap="round" />
+      <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" />
+    </svg>
+  ),
+  shield: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+};
 
 const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt"];
 const ACCEPTED_TYPES = [
@@ -9,19 +61,10 @@ const ACCEPTED_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
 ];
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-
-const NAV_ITEMS = [
-  { label: "Dashboard", to: "/student/dashboard" },
-  { label: "Courses", to: "/student/courses" },
-  { label: "Upload Submission", to: "/student/upload" },
-  { label: "My Submissions", to: "/student/submissions" },
-  { label: "Reports", to: "/student/reports" },
-  { label: "Profile", to: "/student/profile" },
-  { label: "Settings", to: "/student/settings" },
-];
+const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB
 
 function formatFileSize(bytes) {
+  if (!bytes) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -32,83 +75,64 @@ function getFileExtension(fileName) {
   return parts.length > 1 ? `.${parts.pop().toLowerCase()}` : "";
 }
 
-function getFileTypeLabel(fileName) {
-  const ext = getFileExtension(fileName);
-  if (ext === ".pdf") return "PDF";
-  if (ext === ".docx") return "DOCX";
-  if (ext === ".txt") return "TXT";
-  return ext.replace(".", "").toUpperCase() || "FILE";
-}
-
 export default function UploadSubmission() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user } = useAuth();
 
-  const [course, setCourse] = useState("");
-  const [coursesList, setCoursesList] = useState([]);
-  const [coursesLoading, setCoursesLoading] = useState(true);
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+
+  // Target paper to check
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileError, setFileError] = useState("");
-  const [isDragActive, setIsDragActive] = useState(false);
+  const [isDragActiveTarget, setIsDragActiveTarget] = useState(false);
+
+  // Reference documents for current check
+  const [referenceFiles, setReferenceFiles] = useState([]);
+  const [isDragActiveRefs, setIsDragActiveRefs] = useState(false);
+
+  const [customReferences, setCustomReferences] = useState([]);
+  const [selectedCustomIds, setSelectedCustomIds] = useState([]);
+  const [useAllCustomRefs, setUseAllCustomRefs] = useState(false);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [submittedInfo, setSubmittedInfo] = useState(null);
+  const [reportId, setReportId] = useState(null);
 
-  const fileInputRef = useRef(null);
+  const targetFileInputRef = useRef(null);
+  const refFileInputRef = useRef(null);
 
   useEffect(() => {
-    let isMounted = true;
-    async function loadEnrolledCourses() {
-      setCoursesLoading(true);
+    // Load saved reference documents if available
+    const loadSavedReferences = async () => {
       try {
-        const response = await getStudentEnrolledCourses();
-        if (isMounted && response && response.courses) {
-          const mapped = response.courses.map((c) => ({
-            value: String(c.id),
-            label: `${c.code} - ${c.name}`,
-            code: c.code,
-            name: c.name,
-          }));
-          setCoursesList(mapped);
-          if (mapped.length > 0) {
-            setCourse(mapped[0].value);
-          }
+        const refRes = await getCustomReferences();
+        if (refRes && refRes.success && refRes.references) {
+          setCustomReferences(refRes.references);
         }
-      } catch (err) {
-        console.error("Failed to load enrolled courses:", err);
-      } finally {
-        if (isMounted) setCoursesLoading(false);
+      } catch (refErr) {
+        console.error("Failed to load saved references:", refErr);
       }
-    }
-    loadEnrolledCourses();
-    return () => {
-      isMounted = false;
     };
+    loadSavedReferences();
   }, []);
 
   const validateFile = (file) => {
-    if (!file) {
-      return "Please select a file.";
-    }
-
+    if (!file) return "Please select a valid document file.";
     const ext = getFileExtension(file.name);
-    const typeIsAccepted =
-      ACCEPTED_EXTENSIONS.includes(ext) || ACCEPTED_TYPES.includes(file.type);
+    const typeIsAccepted = ACCEPTED_EXTENSIONS.includes(ext) || ACCEPTED_TYPES.includes(file.type);
 
     if (!typeIsAccepted) {
-      return "Only PDF, DOCX and TXT files are supported.";
+      return `File '${file.name}' has an unsupported format. Please upload PDF, DOCX, or TXT.`;
     }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      return "File size must be less than 10 MB.";
+      return `File '${file.name}' exceeds the 15 MB size limit.`;
     }
 
     return "";
   };
 
-  const handleFileSelection = (file) => {
+  const handleTargetFileSelection = (file) => {
     const error = validateFile(file);
     if (error) {
       setFileError(error);
@@ -117,539 +141,486 @@ export default function UploadSubmission() {
     }
     setFileError("");
     setSelectedFile(file);
-  };
-
-  const handleFileInputChange = (e) => {
-    const file = e.target.files && e.target.files[0];
-    handleFileSelection(file);
-  };
-
-  const handleRemoveFile = () => {
-    setSelectedFile(null);
-    setFileError("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    if (!title.trim()) {
+      setTitle(file.name.replace(/\.[^/.]+$/, ""));
     }
   };
 
-  const handleBrowseClick = () => {
-    fileInputRef.current?.click();
+  const handleTargetInputChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) handleTargetFileSelection(file);
+    if (e.target) e.target.value = "";
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragActive(true);
+  const handleReferenceFilesAdd = (files) => {
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files);
+    const errors = [];
+    const validToAdd = [];
+
+    newFiles.forEach((file) => {
+      const err = validateFile(file);
+      if (err) {
+        errors.push(err);
+      } else {
+        // Prevent duplicate files by name and size
+        const alreadyExists = referenceFiles.some(
+          (rf) => rf.name === file.name && rf.size === file.size
+        );
+        if (!alreadyExists) {
+          validToAdd.push(file);
+        }
+      }
+    });
+
+    if (errors.length > 0) {
+      setFileError(errors[0]);
+    } else {
+      setFileError("");
+    }
+
+    if (validToAdd.length > 0) {
+      setReferenceFiles((prev) => [...prev, ...validToAdd]);
+    }
   };
 
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragActive(false);
+  const handleRemoveReferenceFile = (indexToRemove) => {
+    setReferenceFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragActive(false);
-    const file = e.dataTransfer.files && e.dataTransfer.files[0];
-    handleFileSelection(file);
+  const toggleCustomRef = (id) => {
+    setSelectedCustomIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
-
-  const isFormValid =
-    course !== "" && title.trim() !== "" && selectedFile !== null && coursesList.length > 0;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFileError("");
 
     if (!selectedFile) {
-      setFileError("Please select a file.");
-      return;
-    }
-
-    if (!isFormValid || isProcessing) {
+      setFileError("Please select a research paper to check (.pdf, .docx, or .txt).");
       return;
     }
 
     setIsProcessing(true);
-    setFileError("");
 
     try {
-      // Create form data for backend submission
       const formData = new FormData();
-      formData.append("title", title.trim());
-      formData.append("course_id", course);
+      const resolvedTitle = (
+        title.trim() ||
+        (selectedFile && selectedFile.name ? selectedFile.name.replace(/\.[^/.]+$/, "") : "Research Paper")
+      ).trim() || "Research Paper";
+      formData.append("title", resolvedTitle);
       formData.append("file", selectedFile);
 
-      // Call API service with JWT authentication
-      const result = await submitAssignment(formData);
-
-      console.log("Submission successful:", result);
-
-      // Direct redirection to the actual plagiarism report page
-      if (result && result.report_id) {
-        navigate(`/student/reports/${result.report_id}`);
-      } else {
-        navigate("/student/reports");
+      // Append reference files uploaded for this comparison
+      if (referenceFiles && referenceFiles.length > 0) {
+        referenceFiles.forEach((refFile) => {
+          if (refFile) {
+            formData.append("reference_files", refFile);
+          }
+        });
       }
-    } catch (error) {
-      console.error("Submission error:", error);
 
-      setFileError(
-        error.message ||
-          "Unable to complete document analysis. Please check your file and try again."
-      );
+      // Optional: saved custom references
+      if (useAllCustomRefs) {
+        formData.append("custom_reference_ids", "all");
+      } else if (selectedCustomIds.length > 0) {
+        formData.append("custom_reference_ids", selectedCustomIds.join(","));
+      } else {
+        formData.append("custom_reference_ids", "none");
+      }
 
+      const response = await submitAssignment(formData);
+
+      if (response && response.success) {
+        setIsSuccess(true);
+        setReportId(response.report_id);
+      } else {
+        setFileError(response.detail || "Failed to analyze document.");
+      }
+    } catch (err) {
+      setFileError(err.message || "Failed to analyze document. Please check your connection and try again.");
+    } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleUploadAnother = () => {
-    setCourse("");
-    setTitle("");
-    setDescription("");
-    setSelectedFile(null);
-    setFileError("");
-    setIsProcessing(false);
-    setIsSuccess(false);
-    setSubmittedInfo(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
   return (
-    <div className="min-h-screen w-full bg-slate-50 flex flex-col lg:flex-row">
-      {/* Sidebar */}
-      <aside className="w-full lg:w-64 bg-slate-900 text-white flex-shrink-0 lg:min-h-screen">
-        <div className="px-6 py-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5L3 8.25l9 3.75 9-3.75-9-3.75zM3 8.25v7.5l9 3.75m0-11.25l9 3.75m-9-3.75v11.25m9-11.25v7.5l-9 3.75"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium leading-tight">
-                Academic Integrity
-              </p>
-              <p className="text-xs text-slate-400 leading-tight">
-                Student Portal
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <nav className="px-3 py-4" aria-label="Student navigation">
-          <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => {
-              const isActive = item.label === "Upload Submission";
-              return (
-                <li key={item.label}>
-                  <Link
-                    to={item.to}
-                    className={`block rounded-lg px-3.5 py-2.5 text-sm transition ${
-                      isActive
-                        ? "bg-white/10 text-white font-medium border border-white/20"
-                        : "text-slate-300 hover:bg-white/5 hover:text-white"
-                    }`}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        <div className="px-3 py-4 mt-auto border-t border-white/10">
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full text-left rounded-lg px-3.5 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition"
+    <div className="flex-1 min-w-0 flex flex-col bg-slate-50 min-h-screen">
+      {/* Top Header */}
+      <header className="hidden lg:flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4 shadow-xs sticky top-0 z-30">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/student/dashboard"
+            className="p-1.5 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition"
           >
-            Logout
-          </button>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <main className="flex-1 px-4 py-8 sm:px-8 lg:px-10">
-        <div className="max-w-3xl mx-auto">
-          <nav aria-label="Breadcrumb" className="mb-3">
-            <ol className="flex items-center gap-2 text-sm text-slate-500">
-              <li>
-                <Link to="/student/dashboard" className="hover:text-emerald-600">
-                  Student Dashboard
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li className="text-slate-700 font-medium">Upload Submission</li>
-            </ol>
-          </nav>
-
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-slate-900">
-              Upload Assignment
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Submit your academic document for similarity analysis.
+            {icons.arrowLeft({ className: "h-4 w-4" })}
+          </Link>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">Check Document Similarity</h1>
+              <span className="rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 text-xs font-semibold">
+                GapGuard AI
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Upload your research paper and reference documents for instant similarity analysis.
             </p>
           </div>
+        </div>
+      </header>
 
-          {isProcessing ? (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center">
-              <svg
-                className="mx-auto h-8 w-8 animate-spin text-emerald-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-4xl mx-auto w-full space-y-6">
+        {fileError && (
+          <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs font-semibold text-rose-900 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-rose-600 flex-shrink-0" />
+              <span>{fileError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFileError("")}
+              className="text-rose-700 hover:text-rose-900"
+            >
+              {icons.close({ className: "h-4 w-4" })}
+            </button>
+          </div>
+        )}
+
+        {isSuccess ? (
+          <div className="rounded-2xl border border-blue-200 bg-white p-6 sm:p-10 shadow-sm text-center space-y-6">
+            <div className="mx-auto h-16 w-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              {icons.checkCircle({ className: "h-9 w-9 text-blue-600" })}
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">Similarity Check Complete!</h2>
+              <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto">
+                Your research paper has been preprocessed and compared against the selected reference documents.
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3 pt-2">
+              <Link
+                to={`/student/reports/${reportId}`}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-700 transition"
               >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              <p className="mt-4 text-sm font-medium text-slate-900">
-                Submission received successfully.
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                Your document is being prepared for similarity analysis.
-              </p>
+                View Similarity Report
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSuccess(false);
+                  setSelectedFile(null);
+                  setReferenceFiles([]);
+                  setTitle("");
+                  setReportId(null);
+                }}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Check Another Document
+              </button>
             </div>
-          ) : isSuccess && submittedInfo ? (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8">
-              <div className="flex items-start gap-3 mb-5">
-                <div className="w-10 h-10 rounded-full bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-green-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.5 12.75l6 6 9-13.5"
-                    />
-                  </svg>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Step 1: Research Paper to Check */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">
+                    1
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900">Research Paper to Check</h2>
+                    <p className="text-xs text-slate-500">Upload the primary document you want to evaluate</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    Submission Received
-                  </h2>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    Your assignment has been submitted successfully.
-                  </p>
-                </div>
+                <span className="text-[11px] font-semibold text-slate-400">PDF, DOCX, TXT</span>
               </div>
 
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm">
-                <div className="border border-slate-200 rounded-lg p-3.5">
-                  <dt className="text-slate-500">Assignment Title</dt>
-                  <dd className="text-slate-900 font-medium mt-0.5">
-                    {submittedInfo.title}
-                  </dd>
-                </div>
-                <div className="border border-slate-200 rounded-lg p-3.5">
-                  <dt className="text-slate-500">Course</dt>
-                  <dd className="text-slate-900 font-medium mt-0.5">
-                    {submittedInfo.course}
-                  </dd>
-                </div>
-                <div className="border border-slate-200 rounded-lg p-3.5">
-                  <dt className="text-slate-500">File Name</dt>
-                  <dd className="text-slate-900 font-medium mt-0.5 truncate">
-                    {submittedInfo.fileName}
-                  </dd>
-                </div>
-                <div className="border border-slate-200 rounded-lg p-3.5">
-                  <dt className="text-slate-500">Status</dt>
-                  <dd className="mt-0.5">
-                    <span className="inline-flex items-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-medium">
-                      Processing
-                    </span>
-                  </dd>
-                </div>
-              </dl>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Link
-                  to="/student/submissions"
-                  className="flex-1 text-center rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
-                >
-                  View My Submissions
-                </Link>
-                <button
-                  type="button"
-                  onClick={handleUploadAnother}
-                  className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
-                >
-                  Upload Another
-                </button>
+              {/* Document Title (Optional) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Document Title <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  disabled={isProcessing}
+                  placeholder="e.g. Comparative Analysis of Neural Attention Draft"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 transition"
+                />
               </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} noValidate className="space-y-6">
-              {/* Assignment Information */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8">
-                <h2 className="text-base font-semibold text-slate-900 mb-4">
-                  Assignment Information
-                </h2>
 
-                <div className="space-y-5">
-                  {!coursesLoading && coursesList.length === 0 && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 space-y-2">
-                      <div className="flex items-center gap-2 font-medium">
-                        <svg className="h-5 w-5 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <span>No Enrolled Courses Found</span>
-                      </div>
-                      <p className="text-xs text-amber-700">
-                        You must enroll in a course before submitting assignments for academic integrity analysis.
-                      </p>
-                      <Link
-                        to="/student/courses"
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 bg-amber-200/70 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition"
-                      >
-                        Browse & Enroll in Courses &rarr;
-                      </Link>
+              {/* Primary File Dropzone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragActiveTarget(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsDragActiveTarget(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragActiveTarget(false);
+                  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+                  if (file) handleTargetFileSelection(file);
+                }}
+                className={`relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 transition-colors ${
+                  isDragActiveTarget
+                    ? "border-blue-500 bg-blue-50/50"
+                    : selectedFile
+                    ? "border-blue-300 bg-blue-50/20"
+                    : "border-slate-300 bg-slate-50/50 hover:bg-slate-100 hover:border-blue-300"
+                }`}
+              >
+                <input
+                  type="file"
+                  ref={targetFileInputRef}
+                  onChange={handleTargetInputChange}
+                  accept=".pdf,.docx,.txt"
+                  className="absolute inset-0 z-50 h-full w-full cursor-pointer opacity-0"
+                  disabled={isProcessing}
+                />
+                {selectedFile ? (
+                  <div className="flex flex-col items-center text-center">
+                    <div className="mb-3 rounded-xl bg-blue-100 p-3 text-blue-600">
+                      {icons.fileDoc({ className: "h-8 w-8" })}
                     </div>
-                  )}
-
-                  <div>
-                    <label
-                      htmlFor="course"
-                      className="block text-sm font-medium text-slate-700 mb-1.5"
-                    >
-                      Course
-                    </label>
-                    <select
-                      id="course"
-                      name="course"
-                      value={course}
-                      disabled={coursesLoading || coursesList.length === 0}
-                      onChange={(e) => setCourse(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
-                    >
-                      {coursesLoading ? (
-                        <option value="">Loading enrolled courses...</option>
-                      ) : coursesList.length === 0 ? (
-                        <option value="">No enrolled courses available</option>
-                      ) : (
-                        <>
-                          <option value="">Select an enrolled course</option>
-                          {coursesList.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </>
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="title"
-                      className="block text-sm font-medium text-slate-700 mb-1.5"
-                    >
-                      Assignment Title
-                    </label>
-                    <input
-                      id="title"
-                      name="title"
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Enter assignment title"
-                      className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="description"
-                      className="block text-sm font-medium text-slate-700 mb-1.5"
-                    >
-                      Description{" "}
-                      <span className="text-slate-400 font-normal">
-                        (optional)
-                      </span>
-                    </label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Briefly describe your assignment"
-                      rows={3}
-                      className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* File Upload */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8">
-                <h2 className="text-base font-semibold text-slate-900 mb-4">
-                  Document Upload
-                </h2>
-
-                {!selectedFile ? (
-                  <div
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={`rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${
-                      isDragActive
-                        ? "border-emerald-400 bg-emerald-50"
-                        : "border-slate-300 bg-slate-50"
-                    }`}
-                  >
-                    <div className="mx-auto w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 text-emerald-600"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 8.25L12 3.75m0 0L7.5 8.25M12 3.75v12"
-                        />
-                      </svg>
-                    </div>
-
-                    <p className="text-sm font-medium text-slate-900">
-                      Upload your document
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1">
-                      Drag and drop your file here, or browse from your
-                      computer.
-                    </p>
-
+                    <p className="text-sm font-bold text-slate-900">{selectedFile.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">{formatFileSize(selectedFile.size)}</p>
                     <button
                       type="button"
-                      onClick={handleBrowseClick}
-                      className="mt-5 inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile(null);
+                      }}
+                      className="mt-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
                     >
-                      Browse Files
+                      Remove file
                     </button>
-
-                    <input
-                      ref={fileInputRef}
-                      id="fileUpload"
-                      name="fileUpload"
-                      type="file"
-                      accept=".pdf,.docx,.txt"
-                      onChange={handleFileInputChange}
-                      className="sr-only"
-                      aria-label="Upload your document"
-                    />
-
-                    <p className="text-xs text-slate-400 mt-4">
-                      Accepted formats: PDF, DOCX, TXT · Maximum file size: 10
-                      MB
-                    </p>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3.5">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 text-emerald-600"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-1.519-3.75L12 12l-1.481 1.5M18.75 21H5.25a2.25 2.25 0 01-2.25-2.25V5.25A2.25 2.25 0 015.25 3h5.379a1.5 1.5 0 011.06.44l5.121 5.121a1.5 1.5 0 01.44 1.06V18.75a2.25 2.25 0 01-2.25 2.25z"
-                          />
-                        </svg>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {selectedFile.name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {getFileTypeLabel(selectedFile.name)} ·{" "}
-                          {formatFileSize(selectedFile.size)}
-                        </p>
-                      </div>
+                  <div className="flex flex-col items-center text-center pointer-events-none">
+                    <div className="mb-4 rounded-xl bg-white p-3.5 shadow-xs text-slate-400 border border-slate-200">
+                      {icons.upload({ className: "h-8 w-8 text-blue-600" })}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={handleRemoveFile}
-                      className="flex-shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-white hover:text-red-600 hover:border-red-300 transition focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    >
-                      Remove
-                    </button>
+                    <p className="text-sm font-bold text-slate-900">
+                      Drag &amp; drop research paper or <span className="text-blue-600 font-semibold">browse files</span>
+                    </p>
+                    <p className="mt-1.5 text-xs text-slate-500 max-w-xs leading-relaxed">
+                      Supported formats: <strong>PDF (.pdf)</strong>, <strong>DOCX (.docx)</strong>, <strong>TXT (.txt)</strong>.
+                      <br />Max size: <strong>15 MB</strong>.
+                    </p>
                   </div>
                 )}
+              </div>
+            </div>
 
-                {fileError && (
-                  <p className="mt-3 text-sm text-red-600" role="alert">
-                    {fileError}
+            {/* Step 2: Reference Documents for Comparison */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
+                    2
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900">Reference Documents for Comparison</h2>
+                    <p className="text-xs text-slate-500">
+                      Upload one or more reference papers, articles, or source files to check against
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 text-xs font-semibold">
+                  {referenceFiles.length} file{referenceFiles.length === 1 ? "" : "s"} added
+                </span>
+              </div>
+
+              {/* Reference Files Multi-Dropzone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragActiveRefs(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsDragActiveRefs(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragActiveRefs(false);
+                  if (e.dataTransfer.files) {
+                    handleReferenceFilesAdd(e.dataTransfer.files);
+                  }
+                }}
+                className={`relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 transition-colors ${
+                  isDragActiveRefs
+                    ? "border-indigo-500 bg-indigo-50/50"
+                    : "border-slate-300 bg-slate-50/50 hover:bg-slate-100 hover:border-indigo-300"
+                }`}
+              >
+                <input
+                  type="file"
+                  ref={refFileInputRef}
+                  onChange={(e) => {
+                    if (e.target.files) handleReferenceFilesAdd(e.target.files);
+                    if (e.target) e.target.value = "";
+                  }}
+                  accept=".pdf,.docx,.txt"
+                  multiple
+                  className="absolute inset-0 z-50 h-full w-full cursor-pointer opacity-0"
+                  disabled={isProcessing}
+                />
+                <div className="flex flex-col items-center text-center pointer-events-none">
+                  <div className="mb-3 rounded-xl bg-white p-3 shadow-xs text-slate-400 border border-slate-200">
+                    {icons.referenceDoc({ className: "h-6 w-6 text-indigo-600" })}
+                  </div>
+                  <p className="text-sm font-bold text-slate-900">
+                    Drop reference documents here or <span className="text-indigo-600 font-semibold">select multiple files</span>
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    You can add multiple reference files (PDF, DOCX, TXT) in a single check.
+                  </p>
+                </div>
+              </div>
+
+              {/* List of Uploaded Reference Files */}
+              {referenceFiles.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                    Uploaded Reference Files ({referenceFiles.length})
+                  </h3>
+                  <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-slate-50/50 overflow-hidden">
+                    {referenceFiles.map((refFile, index) => (
+                      <div
+                        key={`${refFile.name}-${index}`}
+                        className="flex items-center justify-between p-3 bg-white hover:bg-slate-50 transition"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                            {icons.fileDoc({ className: "h-4 w-4" })}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 truncate">
+                              {refFile.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              {formatFileSize(refFile.size)} &bull; Reference Document
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveReferenceFile(index)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                          title="Remove reference file"
+                        >
+                          {icons.close({ className: "h-4 w-4" })}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Saved References Option (if user has any saved) */}
+              {customReferences.length > 0 && (
+                <div className="pt-4 border-t border-slate-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        {icons.referenceDoc({ className: "h-3.5 w-3.5 text-indigo-600" })}
+                        Also Compare With Saved Reference Library
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Include your previously uploaded reference resources from your library.
+                      </p>
+                    </div>
+                    <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={useAllCustomRefs}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setUseAllCustomRefs(val);
+                          if (val) {
+                            setSelectedCustomIds(customReferences.map((r) => r.id));
+                          }
+                        }}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                      />
+                      <span>Include all saved references</span>
+                    </label>
+                  </div>
+
+                  {!useAllCustomRefs && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      {customReferences.map((ref) => {
+                        const isChecked = selectedCustomIds.includes(ref.id);
+                        return (
+                          <label
+                            key={ref.id}
+                            className={`flex items-start gap-2.5 p-2 rounded-lg border cursor-pointer transition ${
+                              isChecked
+                                ? "bg-white border-blue-300 shadow-2xs"
+                                : "bg-slate-100/60 border-slate-200 opacity-60"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleCustomRef(ref.id)}
+                              className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                            />
+                            <div className="min-w-0 text-xs">
+                              <p className="font-semibold text-slate-900 truncate">
+                                {ref.title}
+                              </p>
+                              <p className="text-[10px] text-slate-500 truncate">
+                                {ref.author || "Saved Reference"} {ref.publication_year ? `(${ref.publication_year})` : ""}
+                              </p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-end gap-3.5 pt-2">
+              <Link
+                to="/student/dashboard"
+                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
+              >
+                Cancel
+              </Link>
+              <button
+                type="submit"
+                disabled={isProcessing || !selectedFile}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isProcessing ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span>Analyzing Document...</span>
+                  </>
+                ) : (
+                  <>
+                    {icons.upload({ className: "h-4 w-4" })}
+                    Check Similarity
+                  </>
                 )}
-              </div>
-
-              {/* Informational box */}
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-5 py-4">
-                <p className="text-sm text-emerald-900">
-                  Your document will be analyzed for content similarity
-                  against the available academic reference corpus.
-                </p>
-                <p className="text-sm text-emerald-800 mt-2">
-                  <span className="font-medium">Important:</span> A
-                  similarity score does not by itself prove plagiarism.
-                  Results are intended to support academic review.
-                </p>
-              </div>
-
-              {/* Submit */}
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={!isFormValid || isProcessing}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500"
-                >
-                  Submit for Analysis
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
+              </button>
+            </div>
+          </form>
+        )}
       </main>
     </div>
   );

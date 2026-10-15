@@ -26,7 +26,10 @@ def analyze_document(file_bytes: bytes, filename: str):
         raise ValueError("No meaningful text found after preprocessing.")
 
     # Step 3: Calculate plagiarism similarity
-    result = calculate_similarity(processed_text)
+    result = calculate_similarity(
+        processed_text,
+        original_text=extracted_text,
+    )
 
     # Step 4: Add basic document information
     result["filename"] = filename

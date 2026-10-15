@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getProfessorDashboard } from "../service/api";
+import ProfessorSidebar from "../components/ProfessorSidebar";
 
 /* ---------------------------------------------------------
    Inline icons (no extra dependency)
@@ -104,6 +105,7 @@ const icons = {
 const navItems = [
   { label: "Dashboard", icon: icons.dashboard, to: "/professor/dashboard" },
   { label: "Submissions", icon: icons.submissions, to: "/professor/submissions" },
+  { label: "Faculty Review Dashboard", icon: icons.docCheck, to: "/faculty/reviews" },
   { label: "Reports", icon: icons.reports, to: "/professor/reports" },
   { label: "Courses", icon: icons.courses, to: "/professor/courses" },
   { label: "Profile", icon: icons.profile, to: "/professor/profile" },
@@ -111,6 +113,7 @@ const navItems = [
 ];
 
 const quickActions = [
+  { label: "Faculty Review Dashboard", description: "Review and manage student research projects", to: "/faculty/reviews", icon: icons.docCheck },
   { label: "Review Submissions", description: "Open pending student submissions", to: "/professor/submissions", icon: icons.submissions },
   { label: "View Reports", description: "Open similarity reports", to: "/professor/reports", icon: icons.reports },
   { label: "View Courses", description: "See all courses you teach", to: "/professor/courses", icon: icons.courses },
@@ -236,63 +239,14 @@ export default function ProfessorDashboard() {
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs lg:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed z-50 inset-y-0 left-0 w-72 transform bg-[#0F172A] text-slate-100 px-5 py-6 flex flex-col transition-transform duration-200 lg:static lg:translate-x-0 lg:flex-shrink-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-white">AI Academic Integrity</p>
-            <p className="text-xs text-emerald-400 mt-0.5">Professor Portal</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close navigation menu"
-            className="p-1 text-slate-300 hover:text-white lg:hidden"
-          >
-            {icons.close({ className: "h-5 w-5" })}
-          </button>
-        </div>
-
-        <nav className="mt-8 flex-1 space-y-1">
-          {navItems.map((item) => {
-            const isActive = item.label === "Dashboard";
-            return (
-              <Link
-                key={item.label}
-                to={item.to}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                  isActive
-                    ? "bg-emerald-500 text-white"
-                    : "text-slate-300 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                {item.icon({ className: "h-5 w-5 flex-shrink-0" })}
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <button
-          type="button"
-          onClick={logout}
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
-        >
-          {icons.logout({ className: "h-5 w-5" })}
-          Logout
-        </button>
-      </aside>
+      {/* Unified Professor Sidebar */}
+      <ProfessorSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main content */}
       <div className="flex-1 min-w-0">

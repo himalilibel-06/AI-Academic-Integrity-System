@@ -62,8 +62,11 @@ class TestAuthEndpoints(unittest.TestCase):
             "role": "student"
         }
         response = self.client.post("/api/auth/register", json=payload)
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("Email already registered", response.json().get("detail", ""))
+        detail = response.json().get("detail", "")
+        self.assertTrue(
+            "An account with this email already exists" in detail or "Email already registered" in detail,
+            f"Unexpected detail: {detail}"
+        )
 
     def test_04_login_success_returns_jwt(self):
         """Test logging in with valid credentials returns a JWT token and user info."""

@@ -1,10 +1,17 @@
+import os
 import sqlite3
 from pathlib import Path
 
 
 # Location of the SQLite database
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATABASE_PATH = BASE_DIR / "academic_integrity.db"
+
+_env_db_path = os.getenv("DATABASE_PATH")
+if _env_db_path:
+    DATABASE_PATH = Path(_env_db_path).resolve()
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+else:
+    DATABASE_PATH = BASE_DIR / "academic_integrity.db"
 
 
 def get_connection():
@@ -12,7 +19,11 @@ def get_connection():
     Create and return a connection to the SQLite database.
     Enforces foreign key constraint checks.
     """
-    connection = sqlite3.connect(DATABASE_PATH)
+    db_path = Path(DATABASE_PATH)
+    if db_path.parent:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    connection = sqlite3.connect(db_path)
 
     # Enable foreign key support in SQLite
     connection.execute("PRAGMA foreign_keys = ON;")
@@ -21,6 +32,7 @@ def get_connection():
     connection.row_factory = sqlite3.Row
 
     return connection
+
 
 
 def initialize_database():
@@ -120,6 +132,281 @@ def initialize_database():
             FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
         )
     """)
+        # Safe migration for EduGuard explainable evidence
+    cursor.execute("PRAGMA table_info(plagiarism_reports)")
+    existing_report_columns = {
+        row["name"] for row in cursor.fetchall()
+    }
+
+    if "evidence_details" not in existing_report_columns:
+        cursor.execute(
+            "ALTER TABLE plagiarism_reports "
+            "ADD COLUMN evidence_details TEXT DEFAULT '{}'"
+        )
+
+    # 6. Research Projects table (Prototype research-project registry)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS research_projects (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            domain TEXT,
+            student_id TEXT DEFAULT '',
+            research_problem TEXT,
+            research_objective TEXT,
+            claimed_research_gap TEXT,
+            proposed_method TEXT,
+            expected_contribution TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("PRAGMA table_info(research_projects)")
+    existing_project_columns = {
+        row["name"] for row in cursor.fetchall()
+    }
+    if "student_id" not in existing_project_columns:
+        cursor.execute(
+            "ALTER TABLE research_projects "
+            "ADD COLUMN student_id TEXT DEFAULT ''"
+        )
+
+    # 7. Faculty Reviews table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS faculty_reviews (
+            review_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            project_title TEXT NOT NULL,
+            student_id TEXT,
+            reviewer_id TEXT,
+            reviewer_name TEXT,
+            status TEXT NOT NULL DEFAULT 'Not Reviewed',
+            comments TEXT NOT NULL DEFAULT '{}',
+            recommendations TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 8. Research Manuscripts table (tracks versions per project)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS research_manuscripts (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            version_number INTEGER NOT NULL DEFAULT 1,
+            version_label TEXT NOT NULL DEFAULT 'Version 1',
+            file_name TEXT,
+            file_type TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES research_projects(id) ON DELETE CASCADE
+        )
+    """)
+
+    # 9. Faculty Review Cycles table (tracks revision cycles chronologically)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS faculty_review_cycles (
+            cycle_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            review_id TEXT,
+            previous_manuscript_id TEXT,
+            current_manuscript_id TEXT NOT NULL,
+            previous_version INTEGER,
+            current_version INTEGER NOT NULL DEFAULT 1,
+            faculty_status TEXT NOT NULL DEFAULT 'Not Reviewed',
+            cycle_status TEXT NOT NULL DEFAULT 'Review Started',
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES research_projects(id) ON DELETE CASCADE
+        )
+    """)
+
+    # 10. Custom Scholar References table (user-provided reference papers for plagiarism comparison)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_references (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            author TEXT DEFAULT '',
+            publication_year TEXT DEFAULT '',
+            research_field TEXT DEFAULT '',
+            filename TEXT DEFAULT '',
+            file_path TEXT DEFAULT '',
+            original_text TEXT NOT NULL,
+            processed_text TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
+    # Seed default research projects if empty
+    cursor.execute("SELECT COUNT(*) AS cnt FROM research_projects")
+    if cursor.fetchone()["cnt"] == 0:
+        default_projects = [
+            (
+                "proj-01",
+                "Robust Deep Feature Attribution in Agricultural Disease Detection",
+                "Computer Vision & Agriculture AI",
+                "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.",
+                "Develop edge-compatible Vision Transformer attribution alignment under severe illumination drift.",
+                "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.",
+                "Cross-attention attribution pooling with contrastive token alignment on edge hardware.",
+                "A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.",
+            ),
+            (
+                "proj-02",
+                "Differential Privacy in Federated Knowledge Graph Embeddings",
+                "Cybersecurity & Privacy-Preserving ML",
+                "Decentralized knowledge graph completion algorithms risk membership inference attacks, exposing sensitive relationship links across participating edge nodes.",
+                "Formulate an efficient differential privacy mechanism for asynchronous federated knowledge graph embedding updates.",
+                "Prior privacy-preserving federated embedding techniques inject noise uniformly across all gradients, degrading entity ranking precision and destroying topological link semantics.",
+                "We propose Topology-Aware Gradient Perturbation (TAGP), which adaptively scales Laplacian noise inversely proportional to entity graph centrality while clipping relational gradient norms.",
+                "The first topology-adaptive differential privacy mechanism for federated relational embedding that maintains SOTA Hits@10 while satisfying strict privacy budgets.",
+            ),
+            (
+                "proj-03",
+                "Zero-Shot Cross-Lingual Semantic Parsing for Low-Resource Dialects",
+                "Natural Language Processing",
+                "Semantic parsers perform poorly on low-resource indigenous language varieties where annotated logical form treebanks are nonexistent.",
+                "Enable accurate logical form synthesis in low-resource target dialects without requiring target-language training utterances.",
+                "State-of-the-art cross-lingual transfer models rely on high-resource pivot languages and exhibit significant syntactic drift when evaluated on dialectal varieties lacking parallel lexicons.",
+                "We propose a grammar-constrained variational cross-lingual autoencoder with dialect-invariant latent anchor tokens that decouples intent semantics from surface syntax.",
+                "A dialect-invariant anchor representation that improves execution accuracy on zero-shot target dialects by 22.4% over multilingual transformer baselines.",
+            ),
+            (
+                "demo-project-1",
+                "Robust Deep Feature Attribution in Agricultural Disease Detection",
+                "Computer Vision & Agriculture AI",
+                "Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.",
+                "Develop edge-compatible Vision Transformer attribution alignment under severe illumination drift.",
+                "Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented sub-Saharan foliar crop diseases under variable lighting.",
+                "Cross-attention attribution pooling with contrastive token alignment on edge TPU hardware.",
+                "A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.",
+            ),
+        ]
+        cursor.executemany(
+            """
+            INSERT OR IGNORE INTO research_projects (
+                id, title, domain, research_problem, research_objective,
+                claimed_research_gap, proposed_method, expected_contribution
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            default_projects,
+        )
+
+    # Seed default research manuscripts if empty
+    cursor.execute("SELECT COUNT(*) AS cnt FROM research_manuscripts")
+    if cursor.fetchone()["cnt"] == 0:
+        default_manuscripts = [
+            (
+                "manu-01",
+                "proj-01",
+                "Robust Deep Feature Attribution in Agricultural Disease Detection",
+                1,
+                "Version 1 — Initial Draft",
+                "feature_attribution_crop_disease_v1.pdf",
+                "PDF",
+            ),
+            (
+                "manu-02",
+                "proj-01",
+                "Robust Deep Feature Attribution in Agricultural Disease Detection (Revised)",
+                2,
+                "Version 2 — Revised Draft",
+                "feature_attribution_crop_disease_v2_revised.docx",
+                "DOCX",
+            ),
+            (
+                "manu-03",
+                "proj-02",
+                "Differential Privacy in Federated Knowledge Graph Embeddings",
+                1,
+                "Version 1 — Initial Draft",
+                "federated_kg_differential_privacy.pdf",
+                "PDF",
+            ),
+            (
+                "manu-04",
+                "proj-03",
+                "Zero-Shot Cross-Lingual Semantic Parsing for Low-Resource Dialects",
+                1,
+                "Version 1 — Pre-Print Draft",
+                "cross_lingual_semantic_parsing_draft.txt",
+                "TXT",
+            ),
+        ]
+        cursor.executemany(
+            """
+            INSERT OR IGNORE INTO research_manuscripts (
+                id, project_id, title, version_number, version_label, file_name, file_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            default_manuscripts,
+        )
+
+    # Phase 13 Coherent Demo Alignment Migration:
+    # Ensure proj-01 and associated records reflect the coherent agricultural vision demo scenario in existing databases
+    cursor.execute(
+        """
+        UPDATE research_projects
+        SET title = 'Robust Deep Feature Attribution in Agricultural Disease Detection',
+            domain = 'Computer Vision & Agriculture AI',
+            research_problem = 'Field-deployable crop disease models suffer from uninterpretable spatial attributions and high false-positive rates when tested outside laboratory image distributions.',
+            research_objective = 'Develop edge-compatible Vision Transformer attribution alignment under severe illumination drift.',
+            claimed_research_gap = 'Existing lightweight Vision Transformers fail to provide spatially calibrated feature attribution on underrepresented foliar crop diseases under variable field illumination.',
+            proposed_method = 'Cross-attention attribution pooling with contrastive token alignment on edge hardware.',
+            expected_contribution = 'A hierarchical token attribution alignment method with integrated post-training quantization, achieving calibrated pixel attribution maps while reducing model parameter footprint by 45%.'
+        WHERE id = 'proj-01' AND (title LIKE '%Medical Diagnostics%' OR title LIKE '%Explainable Contrastive%')
+        """
+    )
+    cursor.execute(
+        """
+        UPDATE research_manuscripts
+        SET title = 'Robust Deep Feature Attribution in Agricultural Disease Detection',
+            file_name = 'feature_attribution_crop_disease_v1.pdf'
+        WHERE id = 'manu-01' AND title LIKE '%Medical Diagnostics%'
+        """
+    )
+    cursor.execute(
+        """
+        UPDATE research_manuscripts
+        SET title = 'Robust Deep Feature Attribution in Agricultural Disease Detection (Revised)',
+            file_name = 'feature_attribution_crop_disease_v2_revised.docx'
+        WHERE id = 'manu-02' AND title LIKE '%Medical Diagnostics%'
+        """
+    )
+    cursor.execute(
+        """
+        UPDATE faculty_reviews
+        SET project_title = 'Robust Deep Feature Attribution in Agricultural Disease Detection'
+        WHERE project_id = 'proj-01' AND project_title LIKE '%Medical Diagnostics%'
+        """
+    )
+
+    # Phase 14 Demo Credentials Seeding:
+    # Ensure DEMO_CHECKLIST.md accounts (student@example.com & professor@example.com) exist
+    cursor.execute("SELECT id FROM users WHERE email = 'student@example.com'")
+    if not cursor.fetchone():
+        from werkzeug.security import generate_password_hash
+        student_pwd = generate_password_hash("password123")
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO users (name, email, password_hash, role)
+            VALUES (?, ?, ?, ?)
+            """,
+            ("Demo Student", "student@example.com", student_pwd, "student"),
+        )
+
+    cursor.execute("SELECT id FROM users WHERE email = 'professor@example.com'")
+    if not cursor.fetchone():
+        from werkzeug.security import generate_password_hash
+        prof_pwd = generate_password_hash("password123")
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO users (name, email, password_hash, role)
+            VALUES (?, ?, ?, ?)
+            """,
+            ("Dr. Demo Professor", "professor@example.com", prof_pwd, "professor"),
+        )
 
     # Useful Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_courses_professor ON courses(professor_id)")
@@ -127,6 +414,10 @@ def initialize_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_submissions_course ON submissions(course_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_submission ON plagiarism_reports(submission_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_faculty_reviews_project ON faculty_reviews(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_research_manuscripts_project ON research_manuscripts(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_review_cycles_project ON faculty_review_cycles(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_references_user ON custom_references(user_id)")
 
     connection.commit()
     connection.close()
@@ -134,4 +425,4 @@ def initialize_database():
 
 if __name__ == "__main__":
     initialize_database()
-    print("Database initialized successfully!")
+    print("Database initialized successfully!")

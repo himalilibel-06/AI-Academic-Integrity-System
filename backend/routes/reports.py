@@ -1,16 +1,38 @@
 import html
 import hashlib
+import io
 import json
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, status, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
+
+# Compatibility fix for openssl_md5 not supporting usedforsecurity argument
+_orig_md5 = hashlib.md5
+def _safe_md5(*args, **kwargs):
+    kwargs.pop("usedforsecurity", None)
+    return _orig_md5(*args, **kwargs)
+hashlib.md5 = _safe_md5
+
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    HRFlowable,
+    KeepTogether,
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 from database.database import get_connection
 from models.report import (
     get_report_by_id,
     get_latest_report_by_student,
+    get_latest_report_for_professor,
     update_report_review,
 )
 from models.submission import get_submission_with_details
@@ -56,10 +78,27 @@ def normalize_matches(raw_matches):
                             "source_snippet": str(seg.get("source_snippet", "")),
                             "similarity": round(float(seg.get("similarity", 0.0)), 1)
                         })
+            raw_type = str(item.get("type", "My Reference Resource"))
+            raw_title = str(item.get("title", "Reference Document"))
+            filename = str(item.get("filename", ""))
+            ref_id = str(item.get("reference_id") or item.get("id", "ref"))
+
+            is_legacy = (
+                raw_type in ("Student Submission Archive", "Academic Reference Corpus")
+                or raw_title.startswith("Peer Submission:")
+                or ref_id.startswith("sub_")
+                or "P0" in ref_id
+            )
+
+            display_type = "Historical Archived Source" if is_legacy else "User-Provided Reference"
+
             normalized.append({
-                "reference_id": str(item.get("reference_id") or item.get("id", "ref")),
-                "title": str(item.get("title", "Reference Document")),
-                "type": str(item.get("type", "Academic Reference Corpus")),
+                "reference_id": ref_id,
+                "title": raw_title,
+                "filename": filename,
+                "type": display_type,
+                "raw_type": raw_type,
+                "is_legacy": is_legacy,
                 "similarity_percentage": round(float(item.get("similarity_percentage", 0.0)), 2),
                 "matched_segments": clean_segments
             })
@@ -72,6 +111,7 @@ def get_latest_report(payload: dict = Depends(get_current_user_payload)):
     Retrieve the most recently generated plagiarism report for the logged-in student.
     """
     user_id = payload.get("sub")
+    user_role = payload.get("role")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -84,6 +124,12 @@ def get_latest_report(payload: dict = Depends(get_current_user_payload)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid user ID format in token."
+        )
+
+    if user_role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can access latest student report."
         )
 
     connection = get_connection()
@@ -179,10 +225,25 @@ def get_report(report_id: int, payload: dict = Depends(get_current_user_payload)
             )
 
         # Ownership authorization check
-        if user_role == "student" and submission["student_id"] != user_id_int:
+        if user_role == "student":
+            if submission["student_id"] != user_id_int:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to access another student's report."
+                )
+        elif user_role == "professor":
+            cursor = connection.cursor()
+            cursor.execute("SELECT professor_id FROM courses WHERE id = ?", (submission["course_id"],))
+            course_row = cursor.fetchone()
+            if not course_row or course_row["professor_id"] != user_id_int:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to view reports for courses you do not teach."
+                )
+        else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not authorized to access another student's report."
+                detail="You are not authorized to access this report."
             )
 
         matches = normalize_matches(report["matches"])
@@ -762,7 +823,7 @@ def build_html_report(report: dict, submission: dict, matches: list, audit_hash:
                     <span style="font-size: 12px; color: #64748b; margin-left: 8px;">Review Status: <strong>{review_status}</strong></span>
                 </div>
                 <div style="font-size: 13px; color: #475569;">
-                    Document similarity analysis completed across reference corpus and academic peer submissions.
+                    Document similarity analysis completed across user-provided reference documents and saved custom references.
                 </div>
             </div>
         </div>
@@ -783,8 +844,8 @@ def build_html_report(report: dict, submission: dict, matches: list, audit_hash:
                     <span class="meta-value">{submitted_at}</span>
                 </div>
                 <div class="meta-row">
-                    <span class="meta-label">Course</span>
-                    <span class="meta-value">{course_code} - {course_name}</span>
+                    <span class="meta-label">Analysis Type</span>
+                    <span class="meta-value">Direct Reference &amp; Literature Check</span>
                 </div>
             </div>
 
@@ -844,14 +905,326 @@ def build_html_report(report: dict, submission: dict, matches: list, audit_hash:
 """
 
 
+def build_pdf_report(report: dict, submission: dict, matches: list, audit_hash: str) -> bytes:
+    """
+    Generate an official, professional, downloadable PDF Academic Integrity Report using ReportLab.
+    Contains metadata, similarity metrics, matching sources, sentence-level evidence,
+    methodology details, and academic disclaimers.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=36,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "DocTitle",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor("#0f172a"),
+    )
+
+    subtitle_style = ParagraphStyle(
+        "DocSubTitle",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor("#64748b"),
+    )
+
+    h2_style = ParagraphStyle(
+        "Heading2Custom",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        leading=16,
+        textColor=colors.HexColor("#1e293b"),
+        spaceBefore=10,
+        spaceAfter=4,
+    )
+
+    body_style = ParagraphStyle(
+        "BodyCustom",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor("#334155"),
+    )
+
+    bold_label = ParagraphStyle(
+        "BoldLabel",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor("#1e293b"),
+    )
+
+    meta_val = ParagraphStyle(
+        "MetaVal",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor("#0f172a"),
+    )
+
+    passage_target_style = ParagraphStyle(
+        "PassageTarget",
+        parent=styles["Normal"],
+        fontName="Helvetica-Oblique",
+        fontSize=8.5,
+        leading=12,
+        textColor=colors.HexColor("#92400e"),
+    )
+
+    passage_source_style = ParagraphStyle(
+        "PassageSource",
+        parent=styles["Normal"],
+        fontName="Helvetica-Oblique",
+        fontSize=8.5,
+        leading=12,
+        textColor=colors.HexColor("#334155"),
+    )
+
+    disclaimer_style = ParagraphStyle(
+        "Disclaimer",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor("#64748b"),
+    )
+
+    elements = []
+
+    # Header banner
+    elements.append(Paragraph("GapGuard AI — Academic Integrity Report", title_style))
+    elements.append(Paragraph("AI-Based Plagiarism Detection &amp; Similarity Evidence Audit", subtitle_style))
+    elements.append(Spacer(1, 8))
+    elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb"), spaceAfter=12))
+
+    # Verification / Metadata bar
+    export_ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    meta_table_data = [
+        [
+            Paragraph("<b>Verification Audit Code:</b>", bold_label),
+            Paragraph(f"<font color='#2563eb'><b>{html.escape(audit_hash)}</b></font>", meta_val),
+            Paragraph("<b>Generated:</b>", bold_label),
+            Paragraph(export_ts, meta_val),
+        ],
+        [
+            Paragraph("<b>Document Title:</b>", bold_label),
+            Paragraph(html.escape(submission.get("title") or "Untitled Document"), meta_val),
+            Paragraph("<b>Author / Student:</b>", bold_label),
+            Paragraph(html.escape(submission.get("student_name") or "Student Scholar"), meta_val),
+        ],
+        [
+            Paragraph("<b>Analysis Type:</b>", bold_label),
+            Paragraph("Direct Reference &amp; Literature Check", meta_val),
+            Paragraph("<b>Original File:</b>", bold_label),
+            Paragraph(html.escape(submission.get("filename") or "document"), meta_val),
+        ],
+    ]
+    meta_table = Table(meta_table_data, colWidths=[130, 160, 100, 150])
+    meta_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(meta_table)
+    elements.append(Spacer(1, 12))
+
+    # Overall Similarity & Risk Block
+    score = round(float(report.get("overall_similarity_score", 0.0)), 1)
+    risk_level = report.get("risk_level", "safe")
+
+    if risk_level == "safe":
+        risk_bg = colors.HexColor("#ecfdf5")
+        risk_color = colors.HexColor("#047857")
+        risk_text = "Safe (Low Similarity Evidence)"
+    elif risk_level == "high_risk":
+        risk_bg = colors.HexColor("#fef2f2")
+        risk_color = colors.HexColor("#b91c1c")
+        risk_text = "High Risk (Substantial Textual Overlap)"
+    else:
+        risk_bg = colors.HexColor("#fffbeb")
+        risk_color = colors.HexColor("#b45309")
+        risk_text = "Review Required (Moderate Overlap)"
+
+    rev_feedback = html.escape(report.get("professor_feedback") or "No instructor comments recorded.")
+    score_card_data = [
+        [
+            Paragraph(f"<font size=24 color='{risk_color.hexval()}'><b>{score}%</b></font><br/><font size=8 color='#64748b'>Overall Document Similarity</font>", body_style),
+            Paragraph(f"<b>Classification:</b> <font color='{risk_color.hexval()}'><b>{risk_text}</b></font><br/>"
+                      f"<b>Review Status:</b> {html.escape(str(report.get('review_status') or 'Pending Review').capitalize())}<br/>"
+                      f"<b>Professor Feedback:</b> {rev_feedback}", body_style)
+        ]
+    ]
+    score_table = Table(score_card_data, colWidths=[160, 380])
+    score_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), risk_bg),
+        ("BOX", (0, 0), (-1, -1), 1, risk_color),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    elements.append(score_table)
+    elements.append(Spacer(1, 14))
+
+    # Matched Sources Section
+    elements.append(Paragraph("Matching Reference Sources", h2_style))
+    sources_data = [
+        [
+            Paragraph("<b>#</b>", bold_label),
+            Paragraph("<b>Source Title</b>", bold_label),
+            Paragraph("<b>Source Type</b>", bold_label),
+            Paragraph("<b>Overlap %</b>", bold_label),
+        ]
+    ]
+
+    for idx, m in enumerate(matches, 1):
+        m_title = html.escape(m.get("title") or m.get("filename") or "Reference Document")
+        m_type = html.escape(m.get("type") or "User-Provided Reference")
+        m_pct = round(float(m.get("similarity_percentage", 0.0)), 1)
+        sources_data.append([
+            Paragraph(str(idx), body_style),
+            Paragraph(m_title, body_style),
+            Paragraph(m_type, body_style),
+            Paragraph(f"<b>{m_pct}%</b>", body_style),
+        ])
+
+    if len(sources_data) == 1:
+        sources_data.append([
+            Paragraph("-", body_style),
+            Paragraph("No matching reference sources identified.", body_style),
+            Paragraph("-", body_style),
+            Paragraph("0.0%", body_style),
+        ])
+
+    sources_table = Table(sources_data, colWidths=[24, 300, 160, 56])
+    sources_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+    ]))
+    elements.append(sources_table)
+    elements.append(Spacer(1, 14))
+
+    # Sentence-Level Passage Evidence Section
+    has_passages = False
+    evidence_elements = []
+    evidence_elements.append(Paragraph("Passage-Level Textual Evidence", h2_style))
+
+    for m in matches:
+        segments = m.get("matched_segments") or []
+        if segments:
+            has_passages = True
+            m_title = html.escape(m.get("title", "Reference Source"))
+            m_type = html.escape(m.get("type", "Academic Corpus"))
+            evidence_elements.append(Spacer(1, 4))
+            evidence_elements.append(Paragraph(f"<b>Source:</b> {m_title} <font color='#64748b'>({m_type})</font>", bold_label))
+
+            for s_idx, seg in enumerate(segments, 1):
+                t_snip = html.escape(seg.get("target_snippet", ""))
+                s_snip = html.escape(seg.get("source_snippet", ""))
+                sim = round(float(seg.get("similarity", 0.0)), 1)
+
+                seg_table_data = [
+                    [
+                        Paragraph(f"<b>Passage #{s_idx} &bull; Match Confidence: {sim}%</b>", bold_label),
+                        Paragraph("", bold_label),
+                    ],
+                    [
+                        Paragraph("<b>Submitted Document Passage:</b>", bold_label),
+                        Paragraph("<b>Corresponding Reference Passage:</b>", bold_label),
+                    ],
+                    [
+                        Paragraph(f"&ldquo;{t_snip}&rdquo;", passage_target_style),
+                        Paragraph(f"&ldquo;{s_snip}&rdquo;", passage_source_style),
+                    ]
+                ]
+                seg_table = Table(seg_table_data, colWidths=[265, 275])
+                seg_table.setStyle(TableStyle([
+                    ("SPAN", (0, 0), (1, 0)),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#fef3c7")),
+                    ("BACKGROUND", (0, 1), (0, 2), colors.HexColor("#fffbeb")),
+                    ("BACKGROUND", (1, 1), (1, 2), colors.HexColor("#f8fafc")),
+                    ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ]))
+                evidence_elements.append(Spacer(1, 3))
+                evidence_elements.append(seg_table)
+
+    if has_passages:
+        elements.extend(evidence_elements)
+        elements.append(Spacer(1, 14))
+
+    # Methodology & Disclaimer (KeepTogether)
+    notes_data = [
+        [
+            Paragraph("<b>Similarity Methodology:</b> Document text is extracted and normalized, vectorized using TF-IDF n-grams, and evaluated using cosine similarity against user-supplied reference documents and saved custom references. Sentence-level evidence is extracted using sequence alignment heuristics. Overall similarity represents the maximum single-source cosine similarity across all evaluated reference documents.", disclaimer_style)
+        ],
+        [
+            Paragraph("<b>Academic Disclaimer:</b> Similarity percentage represents textual overlap identified by algorithmic comparison. It does not by itself constitute proof of plagiarism or academic dishonesty. Course instructors evaluate contextual evidence, quotation formatting, disciplinary standards, and citations before making an academic integrity determination.", disclaimer_style)
+        ]
+    ]
+    notes_table = Table(notes_data, colWidths=[540])
+    notes_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+
+    elements.append(KeepTogether([
+        Paragraph("Analysis Methodology &amp; Academic Notice", h2_style),
+        Spacer(1, 4),
+        notes_table
+    ]))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
 @router.get("/{report_id}/export")
 def export_plagiarism_report(
     report_id: int,
-    format: str = Query("html", regex="^(html|json)$"),
+    format: str = Query("html", pattern="^(html|json|pdf)$"),
     payload: dict = Depends(get_current_user_payload)
 ):
     """
     Export an official academic integrity report.
+    Supports formats: html (default), pdf, and json.
     Authorization:
     - Students may export only their own reports.
     - Professors may export reports for courses they teach.
@@ -955,7 +1328,18 @@ def export_plagiarism_report(
                 }
             }
 
-        # Generate HTML report
+        if format == "pdf":
+            pdf_bytes = build_pdf_report(report, submission, matches, audit_hash)
+            filename = f"Integrity_Report_{report_id}.pdf"
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"'
+                }
+            )
+
+        # Default: Generate HTML report
         html_content = build_html_report(report, submission, matches, audit_hash)
         filename = f"Integrity_Report_{report_id}.html"
 

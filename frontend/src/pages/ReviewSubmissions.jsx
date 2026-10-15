@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getProfessorSubmissions, updateReportReview } from "../service/api";
+import ProfessorSidebar from "../components/ProfessorSidebar";
 
 const sidebarItems = [
   { label: "Dashboard", href: "/professor/dashboard" },
@@ -293,58 +294,17 @@ export default function ReviewSubmissions() {
           </button>
         </div>
 
-        {/* Sidebar */}
-        <aside
-          id="professor-sidebar"
-          className={`fixed inset-y-0 left-0 z-20 w-64 transform border-r border-slate-800 bg-[#0F172A] transition-transform duration-200 lg:static lg:translate-x-0 ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } pt-16 lg:pt-0`}
-        >
-          <div className="flex h-full flex-col">
-            <div className="hidden border-b border-slate-800 px-6 py-5 lg:block">
-              <span className="text-lg font-semibold text-white">
-                Integrity<span className="text-emerald-400">Check</span>
-              </span>
-            </div>
-            <nav className="flex-1 space-y-1 px-3 py-4">
-              {sidebarItems.map((item) => {
-                const isActive = item.label === "Submissions";
-                return (
-                  <Link
-                    key={item.label}
-                    to={item.href}
-                    className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                      isActive
-                        ? "bg-emerald-500 text-white"
-                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                    }`}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="border-t border-slate-800 px-3 py-4">
-              <button
-                type="button"
-                onClick={logout}
-                className="w-full text-left rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </aside>
-
+        {/* Mobile sidebar overlay */}
         {sidebarOpen && (
-          <button
-            type="button"
-            aria-label="Close navigation menu"
+          <div
+            className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs lg:hidden transition-opacity"
             onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 z-10 bg-slate-900/30 lg:hidden"
+            aria-hidden="true"
           />
         )}
+
+        {/* Unified Professor Sidebar */}
+        <ProfessorSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         {/* Main content */}
         <main className="min-h-screen w-full flex-1 px-4 pb-12 pt-20 sm:px-6 lg:px-10 lg:pt-10">

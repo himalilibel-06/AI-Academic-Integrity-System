@@ -7,16 +7,8 @@ import {
   downloadSubmissionFile,
   exportPlagiarismReport,
 } from "../service/api";
+import DocumentComparisonViewer from "../components/DocumentComparisonViewer";
 
-const NAV_ITEMS = [
-  { label: "Dashboard", to: "/student/dashboard" },
-  { label: "Courses", to: "/student/courses" },
-  { label: "Upload Submission", to: "/student/upload" },
-  { label: "My Submissions", to: "/student/submissions" },
-  { label: "Reports", to: "/student/reports" },
-  { label: "Profile", to: "/student/profile" },
-  { label: "Settings", to: "/student/settings" },
-];
 
 const ANALYSIS_STEPS = [
   {
@@ -109,6 +101,9 @@ function CircularScore({ percentage }) {
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - Math.min(percentage, 100) / 100);
 
+  const strokeColor =
+    percentage < 15 ? "#059669" : percentage <= 40 ? "#d97706" : "#dc2626";
+
   return (
     <svg
       viewBox="0 0 130 130"
@@ -129,7 +124,7 @@ function CircularScore({ percentage }) {
         cy="65"
         r={radius}
         fill="none"
-        stroke="#059669"
+        stroke={strokeColor}
         strokeWidth="12"
         strokeLinecap="round"
         strokeDasharray={circumference}
@@ -170,10 +165,12 @@ export default function PlagiarismReport() {
   const [reportData, setReportData] = useState(null);
   const [selectedSourceId, setSelectedSourceId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingHtml, setIsExportingHtml] = useState(false);
   const [isDownloadingOriginal, setIsDownloadingOriginal] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState("");
   const [downloadError, setDownloadError] = useState("");
+
 
   useEffect(() => {
     let isMounted = true;
@@ -196,11 +193,14 @@ export default function PlagiarismReport() {
           // Format sources from matches with sentence-level segments
           const sources = (r.matches || []).map((m, idx) => ({
             id: m.reference_id || idx + 1,
-            name: m.title || `Reference Document ${idx + 1}`,
-            type: m.type || "Academic Reference Corpus",
+            name: m.title || m.filename || `Reference Document ${idx + 1}`,
+            filename: m.filename || "",
+            type: m.type || (m.is_legacy ? "Historical Archived Source" : "User-Provided Reference"),
+            isLegacy: !!m.is_legacy,
             similarity: Math.round(m.similarity_percentage !== undefined ? m.similarity_percentage : (m.similarity || 0)),
             matched_segments: m.matched_segments || [],
           }));
+          const hasLegacySources = sources.some((s) => s.isLegacy);
 
           const formattedDate = s.submitted_at
             ? new Date(s.submitted_at).toLocaleDateString("en-US", {
@@ -251,6 +251,7 @@ export default function PlagiarismReport() {
             reviewedAt: formattedReviewDate,
             reviewedByName: r.reviewed_by_name || "Course Instructor",
             hasReview: hasInstructorReview,
+            hasLegacySources: hasLegacySources,
             sources: sources,
           };
 
@@ -281,21 +282,38 @@ export default function PlagiarismReport() {
     reportData?.sources?.[0] ||
     null;
 
-  const handleExportReport = async () => {
+  const handleExportPdf = async () => {
     if (!reportData?.id) return;
-    setIsExporting(true);
+    setIsExportingPdf(true);
+    setDownloadError("");
+    setDownloadSuccess("");
+    try {
+      await exportPlagiarismReport(reportData.id, "pdf");
+      setDownloadSuccess("Official PDF Academic Integrity Report downloaded successfully.");
+      setTimeout(() => setDownloadSuccess(""), 4000);
+    } catch (err) {
+      setDownloadError(err.message || "Failed to export PDF report.");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportHtml = async () => {
+    if (!reportData?.id) return;
+    setIsExportingHtml(true);
     setDownloadError("");
     setDownloadSuccess("");
     try {
       await exportPlagiarismReport(reportData.id, "html");
-      setDownloadSuccess("Official Academic Integrity Report downloaded successfully.");
+      setDownloadSuccess("Official HTML Academic Integrity Report downloaded successfully.");
       setTimeout(() => setDownloadSuccess(""), 4000);
     } catch (err) {
-      setDownloadError(err.message || "Failed to export report.");
+      setDownloadError(err.message || "Failed to export HTML report.");
     } finally {
-      setIsExporting(false);
+      setIsExportingHtml(false);
     }
   };
+
 
   const handleDownloadOriginal = async () => {
     if (!reportData?.submission_id) {
@@ -368,150 +386,7 @@ export default function PlagiarismReport() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 lg:flex">
-      {/* Mobile top bar */}
-      <div className="lg:hidden flex items-center justify-between bg-slate-900 text-white px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5L3 8.25l9 3.75 9-3.75-9-3.75zM3 8.25v7.5l9 3.75m0-11.25l9 3.75m-9-3.75v11.25m9-11.25v7.5l-9 3.75"
-              />
-            </svg>
-          </div>
-          <span className="text-sm font-medium">Academic Integrity</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsSidebarOpen(true)}
-          className="p-2 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
-          aria-label="Open navigation menu"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"
-            />
-          </svg>
-        </button>
-      </div>
-
-      {/* Mobile backdrop */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:flex-shrink-0 lg:min-h-screen ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="px-6 py-6 border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5L3 8.25l9 3.75 9-3.75-9-3.75zM3 8.25v7.5l9 3.75m0-11.25l9 3.75m-9-3.75v11.25m9-11.25v7.5l-9 3.75"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium leading-tight">
-                Academic Integrity
-              </p>
-              <p className="text-xs text-slate-400 leading-tight">
-                Student Portal
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
-            aria-label="Close navigation menu"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        <nav className="px-3 py-4" aria-label="Student navigation">
-          <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => {
-              const isActive = item.label === "Reports";
-              return (
-                <li key={item.label}>
-                  <Link
-                    to={item.to}
-                    className={`block rounded-lg px-3.5 py-2.5 text-sm transition ${
-                      isActive
-                        ? "bg-white/10 text-white font-medium border border-white/20"
-                        : "text-slate-300 hover:bg-white/5 hover:text-white"
-                    }`}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        <div className="px-3 py-4 mt-auto border-t border-white/10">
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full text-left rounded-lg px-3.5 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
-
+    <div className="flex-1 min-w-0 flex flex-col bg-slate-50 text-slate-900 font-sans">
       {/* Main content */}
       <main className="flex-1 px-4 py-8 sm:px-8 lg:px-10">
         <div className="max-w-5xl mx-auto">
@@ -522,7 +397,7 @@ export default function PlagiarismReport() {
                 <li>
                   <Link
                     to="/student/dashboard"
-                    className="hover:text-emerald-600"
+                    className="hover:text-blue-600 transition"
                   >
                     Student Dashboard
                   </Link>
@@ -531,7 +406,7 @@ export default function PlagiarismReport() {
                 <li>
                   <Link
                     to="/student/submissions"
-                    className="hover:text-emerald-600"
+                    className="hover:text-blue-600 transition"
                   >
                     My Submissions
                   </Link>
@@ -543,7 +418,7 @@ export default function PlagiarismReport() {
 
             <Link
               to="/student/submissions"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 transition"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -566,7 +441,7 @@ export default function PlagiarismReport() {
           {loading ? (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center my-6">
               <svg
-                className="mx-auto h-9 w-9 animate-spin text-emerald-600"
+                className="mx-auto h-9 w-9 animate-spin text-blue-600"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -620,13 +495,13 @@ export default function PlagiarismReport() {
               <div className="mt-6 flex justify-center gap-3">
                 <Link
                   to="/student/upload"
-                  className="rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 transition"
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition shadow-sm"
                 >
                   Upload New Assignment
                 </Link>
                 <Link
                   to="/student/dashboard"
-                  className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                  className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
                 >
                   Dashboard
                 </Link>
@@ -656,9 +531,9 @@ export default function PlagiarismReport() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">Course</dt>
+                    <dt className="text-slate-500">Analysis Mode</dt>
                     <dd className="text-slate-900 font-medium mt-0.5">
-                      {reportData.course}
+                      Direct Reference Comparison
                     </dd>
                   </div>
                   <div>
@@ -690,41 +565,41 @@ export default function PlagiarismReport() {
                 </dl>
               </div>
 
-              {/* Instructor Review & Academic Decision Card */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-base font-semibold text-slate-900">
-                        Instructor Review &amp; Academic Decision
-                      </h2>
-                      <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
-                        Authoritative Academic Evaluation
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Official evaluation and feedback recorded by your course instructor.
-                    </p>
-                  </div>
-                  <div>
-                    {(() => {
-                      const badge = getDecisionBadge(reportData.reviewStatus);
-                      return (
-                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${badge.className}`}>
-                          <span className={`h-2 w-2 rounded-full ${badge.dotColor}`} />
-                          {badge.label}
+              {/* Optional Historical Instructor Review Card (only if review exists) */}
+              {reportData.hasReview && (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-semibold text-slate-900">
+                          Instructor Review &amp; Academic Decision
+                        </h2>
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                          Authoritative Academic Evaluation
                         </span>
-                      );
-                    })()}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Evaluation and feedback recorded by course instructor.
+                      </p>
+                    </div>
+                    <div>
+                      {(() => {
+                        const badge = getDecisionBadge(reportData.reviewStatus);
+                        return (
+                          <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${badge.className}`}>
+                            <span className={`h-2 w-2 rounded-full ${badge.dotColor}`} />
+                            {badge.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
-                </div>
 
-                {reportData.hasReview ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-slate-50 rounded-lg p-4 border border-slate-200/80">
                       <div>
                         <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Reviewing Instructor</span>
-                        <p className="font-semibold text-slate-900 mt-0.5">{reportData.reviewedByName}</p>
+                        <p className="font-semibold text-slate-900 mt-0.5">{reportData.reviewedByName || "Course Instructor"}</p>
                       </div>
                       <div>
                         <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Review Decision Date</span>
@@ -732,37 +607,21 @@ export default function PlagiarismReport() {
                       </div>
                     </div>
 
-                    <div>
-                      <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                        Instructor Guidance &amp; Feedback Notes
-                      </h3>
-                      {reportData.professorFeedback ? (
+                    {reportData.professorFeedback && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                          Instructor Guidance &amp; Feedback Notes
+                        </h3>
                         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                           <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
                             {reportData.professorFeedback}
                           </p>
                         </div>
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-sm text-slate-500 italic">
-                          Instructor recorded an academic decision ({getDecisionBadge(reportData.reviewStatus).label}) without additional written comments.
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center">
-                    <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <p className="text-sm font-semibold text-slate-800">Pending Instructor Review</p>
-                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                      Your course instructor has not yet recorded a final academic review decision on this submission. You will see their official verdict and feedback comments here once completed.
-                    </p>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Overall Result - Automated Similarity Analysis */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
@@ -788,8 +647,7 @@ export default function PlagiarismReport() {
                       similarity with the available reference material.
                     </p>
                     <p className="text-sm text-slate-500 mt-3">
-                      Similarity scores are algorithmic indicators of matching content and
-                      are evaluated alongside the instructor&apos;s academic review above.
+                      Similarity score is computed as the maximum single-source cosine similarity across all evaluated reference documents.
                     </p>
                   </div>
                 </div>
@@ -897,17 +755,46 @@ export default function PlagiarismReport() {
                         : "The detected similarity is within a moderate range that may warrant academic review."}
                     </p>
                     <p className="text-sm text-slate-500 mt-2">
-                      Final academic integrity decisions are made by the course instructor shown above.
+                      Inspect the matched passages and evidence sections below to analyze textual overlap.
                     </p>
                   </div>
                 </div>
               </div>
 
+              {/* Historical Report Notice (if report contains legacy sources) */}
+              {reportData.hasLegacySources && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 mb-6 shadow-xs flex items-start gap-3">
+                  <div className="p-1 rounded-lg bg-amber-200/80 text-amber-900 flex-shrink-0 mt-0.5">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wide">Historical Report Notice</h3>
+                    <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                      This earlier report includes comparisons from archived legacy sources (previous student submissions or default literature).
+                      New similarity analyses compare strictly against reference documents uploaded for the analysis or saved in your reference library.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Matched Sources */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-4">
-                  Matched Sources
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-900">
+                      Matched Sources
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Evaluated reference documents and detected textual overlaps
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                    {reportData.sources?.length || 0} reference source{reportData.sources?.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
                 {reportData.sources && reportData.sources.length > 0 ? (
                   <div className="space-y-3">
                     {reportData.sources.map((source) => {
@@ -923,12 +810,25 @@ export default function PlagiarismReport() {
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-slate-900">
+                              <p className="text-sm font-medium text-slate-900 truncate">
                                 {source.name}
                               </p>
-                              <p className="text-xs text-slate-500 mt-0.5">
-                                {source.type}
-                              </p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                {source.isLegacy ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                    Archived Historical Source
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    User-Provided Reference
+                                  </span>
+                                )}
+                                {source.filename && source.filename !== source.name && (
+                                  <span className="text-xs text-slate-500 font-mono">
+                                    {source.filename}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-4 flex-shrink-0">
                               <div className="w-32">
@@ -955,9 +855,9 @@ export default function PlagiarismReport() {
                               <button
                                 type="button"
                                 onClick={() => setSelectedSourceId(source.id)}
-                                className={`flex-shrink-0 rounded-lg px-3.5 py-2 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 ${
+                                className={`flex-shrink-0 rounded-lg px-3.5 py-2 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
                                   isSelected
-                                    ? "bg-emerald-500 text-white"
+                                    ? "bg-blue-600 text-white shadow-xs"
                                     : "border border-slate-300 text-slate-700 hover:bg-slate-50"
                                 }`}
                                 aria-pressed={isSelected}
@@ -972,94 +872,27 @@ export default function PlagiarismReport() {
                   </div>
                 ) : (
                   <p className="text-sm text-slate-500">
-                    No matching reference sources identified in the corpus.
+                    No matching reference sources identified in the comparison library.
                   </p>
                 )}
               </div>
 
-              {/* Matched Content Overview & Sentence-Level Evidence */}
-              {selectedSource && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
-                    <div>
-                      <h2 className="text-base font-semibold text-slate-900">
-                        Evidence Inspection: {selectedSource.name}
-                      </h2>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Source Type: <span className="font-medium text-slate-700">{selectedSource.type}</span> &bull; Source Overlap: <span className="font-semibold text-emerald-700">{selectedSource.similarity}%</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {selectedSource.matched_segments && selectedSource.matched_segments.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                          Sentence-Level Matches ({selectedSource.matched_segments.length} segment{selectedSource.matched_segments.length > 1 ? "s" : ""})
-                        </h3>
-                        <span className="text-xs text-slate-500">
-                          Heuristic threshold: &ge; 60% similarity
-                        </span>
-                      </div>
-                      <div className="space-y-3">
-                        {selectedSource.matched_segments.map((seg, sIdx) => (
-                          <div
-                            key={sIdx}
-                            className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 transition hover:border-slate-300"
-                          >
-                            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/70">
-                              <span className="text-xs font-semibold text-slate-700">
-                                Segment #{sIdx + 1}
-                              </span>
-                              <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
-                                {Math.round(seg.similarity || 0)}% Match
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-900 mb-1">
-                                  Submitted Document Passage
-                                </p>
-                                <p className="text-xs text-slate-800 leading-relaxed italic">
-                                  &ldquo;{seg.target_snippet}&rdquo;
-                                </p>
-                              </div>
-                              <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                                  Matched Reference Passage
-                                </p>
-                                <p className="text-xs text-slate-700 leading-relaxed italic">
-                                  &ldquo;{seg.source_snippet}&rdquo;
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <MatchedTextBlock
-                          label="Submitted Assignment Document"
-                          text={`Document: "${reportData.fileName}" shows ${selectedSource.similarity}% similarity with this reference source.`}
-                        />
-                        <MatchedTextBlock
-                          label="Reference Corpus Source"
-                          text={`Reference Title: "${selectedSource.name}" — Type: ${selectedSource.type}. Comparison computed via TF-IDF Vectorization & Cosine Similarity.`}
-                        />
-                      </div>
-                      <p className="text-xs text-slate-500 mt-3">
-                        Document-level similarity was detected across this reference source based on TF-IDF representation and cosine proximity. No specific verbatim sentence matches exceeded the individual segment threshold.
-                      </p>
-                    </div>
-                  )}
-
-                  <p className="text-xs text-slate-400 mt-4">
-                    Similarity calculated by measuring TF-IDF n-gram vectors and sentence-level similarity against the academic reference corpus.
-                  </p>
+              {/* Document Comparison Viewer */}
+              {reportData.sources && reportData.sources.length > 0 && (
+                <div className="mb-6">
+                  <DocumentComparisonViewer
+                    key={selectedSourceId || "viewer"}
+                    sources={reportData.sources}
+                    fileName={reportData.fileName}
+                    initialSourceIndex={
+                      reportData.sources.findIndex((s) => s.id === selectedSourceId) >= 0
+                        ? reportData.sources.findIndex((s) => s.id === selectedSourceId)
+                        : 0
+                    }
+                  />
                 </div>
               )}
+
 
               {/* Analysis Evidence */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
@@ -1074,7 +907,7 @@ export default function PlagiarismReport() {
                   {ANALYSIS_STEPS.map((step, index) => (
                     <li key={step.name} className="flex gap-3">
                       <div className="flex flex-col items-center">
-                        <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-xs font-medium flex-shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {index + 1}
                         </div>
                         {index < ANALYSIS_STEPS.length - 1 && (
@@ -1164,11 +997,11 @@ export default function PlagiarismReport() {
                     </button>
                     <button
                       type="button"
-                      disabled={isExporting}
-                      onClick={handleExportReport}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                      disabled={isExportingPdf}
+                      onClick={handleExportPdf}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     >
-                      {isExporting ? (
+                      {isExportingPdf ? (
                         <svg className="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -1178,12 +1011,30 @@ export default function PlagiarismReport() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 12m0 0l4.5-4.5M12 12V3" />
                         </svg>
                       )}
-                      Download Official Report
+                      Download PDF Report
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isExportingHtml}
+                      onClick={handleExportHtml}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition shadow-2xs"
+                    >
+                      {isExportingHtml ? (
+                        <svg className="h-4 w-4 animate-spin text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                        </svg>
+                      )}
+                      HTML Certificate
                     </button>
                   </div>
                 </div>
                 {downloadSuccess && (
-                  <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800" role="status">
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-900" role="status">
                     {downloadSuccess}
                   </div>
                 )}

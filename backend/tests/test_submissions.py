@@ -270,6 +270,68 @@ class TestSubmissionAndReportPipeline(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("no readable text", response.json().get("detail", "").lower())
 
+    def test_12_upload_paper_with_multiple_reference_documents_and_no_course(self):
+        """Submit one research paper and two reference documents without course selection."""
+        paper_content = (
+            b"Deep neural networks have achieved remarkable performance in natural language processing "
+            b"and computer vision benchmarks. Attention mechanisms allow models to focus on relevant context."
+        )
+        ref1_content = (
+            b"Attention mechanisms allow models to focus on relevant context and dependencies "
+            b"across sequential data inputs."
+        )
+        ref2_content = (
+            b"Computer vision models and deep neural networks have revolutionized image recognition "
+            b"using convolutional architectures and self-attention."
+        )
+
+        files = [
+            ("file", ("research_paper.txt", io.BytesIO(paper_content), "text/plain")),
+            ("reference_files", ("reference_alpha.txt", io.BytesIO(ref1_content), "text/plain")),
+            ("reference_files", ("reference_beta.txt", io.BytesIO(ref2_content), "text/plain")),
+        ]
+        data = {"title": "Neural Attention Survey"}
+        headers = {"Authorization": f"Bearer {self.student1_token}"}
+
+        response = self.client.post("/api/submissions", data=data, files=files, headers=headers)
+        self.assertEqual(response.status_code, 201)
+        res_data = response.json()
+
+        self.assertTrue(res_data.get("success"))
+        self.assertIn("report_id", res_data)
+        self.assertIn("similarity_score", res_data)
+        self.assertGreaterEqual(res_data["similarity_score"], 0.0)
+
+        # Retrieve and inspect the generated report
+        report_res = self.client.get(f"/api/reports/{res_data['report_id']}", headers=headers)
+        self.assertEqual(report_res.status_code, 200)
+        report_data = report_res.json().get("report", {})
+        self.assertEqual(report_data.get("submission", {}).get("title"), "Neural Attention Survey")
+
+    def test_13_upload_paper_without_explicit_title_succeeds(self):
+        """Submit paper without providing a title: should default cleanly from filename instead of 422 Field required."""
+        paper_content = (
+            b"Reinforcement learning agents optimize cumulative rewards through trial and error "
+            b"interactions with an environment modeled as a Markov decision process."
+        )
+        files = {
+            "file": ("reinforcement_learning_paper.txt", io.BytesIO(paper_content), "text/plain"),
+        }
+        # No title or course_id provided
+        headers = {"Authorization": f"Bearer {self.student1_token}"}
+
+        response = self.client.post("/api/submissions", files=files, headers=headers)
+        self.assertEqual(response.status_code, 201)
+        res_data = response.json()
+        self.assertTrue(res_data.get("success"))
+        self.assertIn("report_id", res_data)
+
+        # Verify title defaulted to filename stem
+        report_res = self.client.get(f"/api/reports/{res_data['report_id']}", headers=headers)
+        self.assertEqual(report_res.status_code, 200)
+        report_data = report_res.json().get("report", {})
+        self.assertEqual(report_data.get("submission", {}).get("title"), "reinforcement_learning_paper")
+
 
 if __name__ == "__main__":
     unittest.main()

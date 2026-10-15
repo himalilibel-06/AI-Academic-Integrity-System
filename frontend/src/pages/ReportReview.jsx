@@ -3,11 +3,14 @@ import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   getPlagiarismReport,
-  getLatestPlagiarismReport,
+  getProfessorSubmissions,
   updateReportReview,
   downloadSubmissionFile,
   exportPlagiarismReport,
 } from "../service/api";
+import ProfessorSidebar from "../components/ProfessorSidebar";
+import DocumentComparisonViewer from "../components/DocumentComparisonViewer";
+
 
 const NAV_ITEMS = [
   { label: "Dashboard", to: "/professor/dashboard" },
@@ -78,7 +81,8 @@ export default function ReportReview() {
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingHtml, setIsExportingHtml] = useState(false);
   const [isDownloadingOriginal, setIsDownloadingOriginal] = useState(false);
   const [exportSuccess, setExportSuccess] = useState("");
   const [exportError, setExportError] = useState("");
@@ -91,7 +95,11 @@ export default function ReportReview() {
       if (routeId) {
         data = await getPlagiarismReport(routeId);
       } else {
-        data = await getLatestPlagiarismReport();
+        const subData = await getProfessorSubmissions();
+        const firstWithReport = subData?.submissions?.find((s) => s.report_id);
+        if (firstWithReport?.report_id) {
+          data = await getPlagiarismReport(firstWithReport.report_id);
+        }
       }
 
       if (data && data.success && data.report) {
@@ -104,7 +112,7 @@ export default function ReportReview() {
         );
         setComments(data.report.professor_feedback || "");
       } else {
-        setError("Report not found or unavailable.");
+        setReport(null);
       }
     } catch (err) {
       setError(err.message || "Failed to load plagiarism report.");
@@ -150,21 +158,38 @@ export default function ReportReview() {
     }
   };
 
-  const handleExportReport = async () => {
+  const handleExportPdf = async () => {
     if (!report?.id) return;
-    setIsExporting(true);
+    setIsExportingPdf(true);
+    setExportError("");
+    setExportSuccess("");
+    try {
+      await exportPlagiarismReport(report.id, "pdf");
+      setExportSuccess("Official PDF Academic Integrity Report downloaded successfully.");
+      setTimeout(() => setExportSuccess(""), 4000);
+    } catch (err) {
+      setExportError(err.message || "Failed to export PDF report.");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportHtml = async () => {
+    if (!report?.id) return;
+    setIsExportingHtml(true);
     setExportError("");
     setExportSuccess("");
     try {
       await exportPlagiarismReport(report.id, "html");
-      setExportSuccess("Official Academic Integrity Report downloaded successfully.");
+      setExportSuccess("Official HTML Academic Integrity Report downloaded successfully.");
       setTimeout(() => setExportSuccess(""), 4000);
     } catch (err) {
-      setExportError(err.message || "Failed to export report.");
+      setExportError(err.message || "Failed to export HTML report.");
     } finally {
-      setIsExporting(false);
+      setIsExportingHtml(false);
     }
   };
+
 
   const handleDownloadOriginal = async () => {
     const subId = report?.submission_id || report?.submission?.id;
@@ -217,70 +242,17 @@ export default function ReportReview() {
       </div>
 
       {/* Mobile backdrop */}
+      {/* Mobile sidebar overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs lg:hidden transition-opacity"
           onClick={() => setIsSidebarOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#0F172A] text-white transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:flex-shrink-0 lg:min-h-screen ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="px-6 py-6 border-b border-slate-800 flex items-center justify-between">
-          <div>
-            <span className="text-lg font-semibold text-white">
-              Integrity<span className="text-emerald-400">Check</span>
-            </span>
-            <p className="text-xs text-slate-400 mt-0.5">Professor Review</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-slate-800"
-            aria-label="Close navigation menu"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <nav className="px-3 py-4 space-y-1">
-          {NAV_ITEMS.map((item) => {
-            const isActive = item.label === "Reports";
-            return (
-              <Link
-                key={item.label}
-                to={item.to}
-                onClick={() => setIsSidebarOpen(false)}
-                className={`block rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  isActive
-                    ? "bg-emerald-500 text-white"
-                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                }`}
-                aria-current={isActive ? "page" : undefined}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="px-3 py-4 mt-auto border-t border-slate-800">
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full text-left rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
+      {/* Unified Professor Sidebar */}
+      <ProfessorSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Main content */}
       <main className="flex-1 px-4 py-8 sm:px-8 lg:px-10 min-w-0">
@@ -437,104 +409,15 @@ export default function ReportReview() {
                 </dl>
               </div>
 
-              {/* Matched Sources / Evidence */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-2">
-                  Matched Reference Sources & Evidence
-                </h2>
-                <p className="text-sm text-slate-500 mb-5">
-                  Sources detected during vector similarity search against reference documents.
-                </p>
-
-                {matchesList.length === 0 ? (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-600">
-                    No matching reference sources detected. The similarity score is minimal or within acceptable boundaries.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {matchesList.map((m, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setSelectedSourceId(idx)}
-                          className={`rounded-lg px-3.5 py-2 text-xs font-medium border transition ${
-                            selectedSourceId === idx
-                              ? "border-emerald-500 bg-emerald-50 text-emerald-800 font-semibold"
-                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                          }`}
-                        >
-                          {m.source || m.name || `Source #${idx + 1}`} ({m.similarity ? `${m.similarity}%` : "Match"})
-                        </button>
-                      ))}
-                    </div>
-
-                    {selectedSource && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 mt-4 space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
-                          <div>
-                            <p className="font-semibold text-slate-900 text-sm">
-                              {selectedSource.source || "Reference Document"}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              Type: {selectedSource.type} &bull; Document Overlap: <span className="font-semibold text-slate-800">{selectedSource.similarity}%</span>
-                            </p>
-                          </div>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            selectedSource.similarity > 30 ? "bg-red-50 text-red-700 border border-red-200" : "bg-amber-50 text-amber-700 border border-amber-200"
-                          }`}>
-                            {selectedSource.similarity}% Overlap
-                          </span>
-                        </div>
-
-                        {selectedSource.matched_segments && selectedSource.matched_segments.length > 0 ? (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                Highlighted Sentence Matches ({selectedSource.matched_segments.length} segment{selectedSource.matched_segments.length > 1 ? "s" : ""})
-                              </p>
-                              <span className="text-[11px] text-slate-500">
-                                Match criteria: Cosine similarity &ge; 60%
-                              </span>
-                            </div>
-                            {selectedSource.matched_segments.map((seg, sIdx) => (
-                              <div key={sIdx} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-2.5">
-                                <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
-                                  <span className="font-semibold text-slate-700">Segment #{sIdx + 1}</span>
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                    {Math.round(seg.similarity || 0)}% Similarity
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  <div className="rounded border border-amber-200 bg-amber-50/50 p-3 text-xs text-slate-800 leading-relaxed">
-                                    <p className="font-semibold text-amber-900 mb-1 text-[11px] uppercase tracking-wider">Submitted Passage</p>
-                                    <p className="italic">&ldquo;{seg.target_snippet}&rdquo;</p>
-                                  </div>
-                                  <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800 leading-relaxed">
-                                    <p className="font-semibold text-slate-600 mb-1 text-[11px] uppercase tracking-wider">Reference Passage ({selectedSource.source})</p>
-                                    <p className="italic">&ldquo;{seg.source_snippet}&rdquo;</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="rounded border border-slate-200 bg-white p-4 text-xs text-slate-600 space-y-2">
-                            {selectedSource.text && (
-                              <p className="leading-relaxed font-mono bg-slate-50 p-2.5 rounded border border-slate-100">
-                                &ldquo;{selectedSource.text}&rdquo;
-                              </p>
-                            )}
-                            <p className="text-slate-500">
-                              Document-level similarity was detected across this reference source based on TF-IDF representation and cosine proximity. No specific verbatim sentence matches exceeded the segment threshold.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+              {/* Interactive Document Comparison Viewer */}
+              <div className="mb-6">
+                <DocumentComparisonViewer
+                  sources={matchesList}
+                  fileName={report.submission?.filename || report.submission?.title || "Submitted Assignment"}
+                  initialSourceIndex={selectedSourceId}
+                />
               </div>
+
 
               {/* AI Reasoning Pipeline Summary */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-6">
@@ -678,11 +561,11 @@ export default function ReportReview() {
                     </button>
                     <button
                       type="button"
-                      disabled={isExporting}
-                      onClick={handleExportReport}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                      disabled={isExportingPdf}
+                      onClick={handleExportPdf}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition shadow-2xs"
                     >
-                      {isExporting ? (
+                      {isExportingPdf ? (
                         <svg className="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -692,7 +575,25 @@ export default function ReportReview() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 12m0 0l4.5-4.5M12 12V3" />
                         </svg>
                       )}
-                      Download Audit Report
+                      Download PDF Report
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isExportingHtml}
+                      onClick={handleExportHtml}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition shadow-2xs"
+                    >
+                      {isExportingHtml ? (
+                        <svg className="h-4 w-4 animate-spin text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                        </svg>
+                      )}
+                      HTML Certificate
                     </button>
                   </div>
                   <Link
